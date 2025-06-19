@@ -3470,6 +3470,44 @@ HTML_CONTENT = """
             updateStartButton();
         }
 
+        // --- Status Message System ---
+        function showStatusMessage(message, type = 'info') {
+            // Create or update status display
+            let statusDiv = document.getElementById('statusMessage');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'statusMessage';
+                statusDiv.style.cssText = `
+                    position: fixed; top: 20px; right: 20px; z-index: 1000;
+                    padding: 1rem; border-radius: 6px; max-width: 400px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                `;
+                document.body.appendChild(statusDiv);
+            }
+            
+            const colors = {
+                'info': 'background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb;',
+                'success': 'background: #d4edda; color: #155724; border: 1px solid #c3e6cb;',
+                'error': 'background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'
+            };
+            
+            statusDiv.style.cssText += colors[type] || colors.info;
+            statusDiv.textContent = message;
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                if (statusDiv.parentNode) {
+                    statusDiv.parentNode.removeChild(statusDiv);
+                }
+            }, 5000);
+        }
+
+        // --- Activity Log System ---
+        function addActivityLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            console.log(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+        }
+
         // --- File Upload ---
         async function handleFileUpload(event) {
             const files = event.target.files;
@@ -3666,23 +3704,7 @@ HTML_CONTENT = """
             addActivityLog(`Exported results (${format})`, 'info');
         }
 
-        // --- Fallback to existing logic ---
-        function displayCitationCarousel(citations) {
-            if (citations && citations.length > 0) {
-                uploadedCitations = citations;
-                filteredCitations = [...citations];
-                displayCitations();
-                    await loadReferences();
-                    updateDisplay();
-                }
-                
-                updateStartButton();
-                
-            } catch (error) {
-                alert('Error uploading files: ' + error.message);
-            }
-        }
-
+        // --- Legacy Citation Display (backward compatibility) ---
         function displayCitationCarousel(citations) {
             const container = document.getElementById('referencesContainer');
             if (!container) return;
