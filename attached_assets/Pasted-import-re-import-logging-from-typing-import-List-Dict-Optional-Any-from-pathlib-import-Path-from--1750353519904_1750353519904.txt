@@ -1,0 +1,440 @@
+import re
+import logging
+from typing import List, Dict, Optional, Any
+from pathlib import Path
+from screening_agent import Citation
+import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+class RISParser:
+    """
+    Parser for RIS (Research Information Systems) format files
+    """
+    
+    # RIS field mappings
+    RIS_FIELDS = {
+        'TY': 'type',
+        'TI': 'title', 
+        'AU': 'author',
+        'AB': 'abstract',
+        'JO': 'journal',
+        'JF': 'journal_full',
+        'PY': 'year',
+        'DA': 'date',
+        'DO': 'doi',
+        'UR': 'url',
+        'KW': 'keyword',
+        'N1': 'notes',
+        'N2': 'abstract_alt',
+        'SN': 'issn',
+        'VL': 'volume',
+        'IS': 'issue',
+        'SP': 'start_page',
+        'EP': 'end_page',
+        'PB': 'publisher',
+        'CY': 'city',
+        'LA': 'language',
+        'M3': 'type_of_work',
+        'ID': 'id'
+    }
+    
+    def __init__(self):
+        self.citations: List[Citation] = []
+    
+    def parse_ris_file(self, filepath: str) -> List[Citation]:
+        """
+        Parse RIS file and return list of Citation objects
+        
+        Args:
+            filepath: Path to RIS file
+            
+        Returns:
+            List of Citation objects
+        """
+        citations = []
+        
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as file:
+                content = file.read()
+            
+            # Split into individual records
+            records = self._split_records(content)
+            
+            logger.info(f"Found {len(records)} records in RIS file")
+            
+            for i, record in enumerate(records):
+                try:
+                    citation = self._parse_record(record)
+                    if citation:
+                        citations.append(citation)
+                except Exception as e:
+                    logger.warning(f"Error parsing record {i+1}: {e}")
+                    continue
+            
+            logger.info(f"Successfully parsed {len(citations)} citations")
+            self.citations = citations
+            return citations
+            
+        except Exception as e:
+            logger.error(f"Error reading RIS file {filepath}: {e}")
+            return []
+    
+    def _split_records(self, content: str) -> List[str]:
+        """
+        Split RIS content into individual records
+        
+        Args:
+            content: Full RIS file content
+            
+        Returns:
+            List of individual record strings
+        """
+        # Records are separated by 'ER  -' (end record marker)
+        records = re.split(r'\nER\s*-\s*\n', content)
+        
+        # Clean up records
+        cleaned_records = []
+        for record in records:
+            record = record.strip()
+            if record and not record.startswith('ER'):
+                cleaned_records.append(record)
+        
+        return cleaned_records
+    
+    def _parse_record(self, record: str) -> Optional[Citation]:
+        """
+        Parse individual RIS record into Citation object
+        
+        Args:
+            record: Individual RIS record string
+            
+        Returns:
+            Citation object or None if parsing fails
+        """
+        fields = {}
+        
+        # Parse RIS fields
+        lines = record.split('\n')
+        current_field = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Check if line starts with RIS field code
+            if re.match(r'^[A-Z0-9]{2}\s*-', line):
+                parts = line.split('-', 1)
+                if len(parts) == 2:
+                    field_code = parts[0].strip()
+                    field_value = parts[1].strip()
+                    current_field = field_code
+                    
+                    if field_code in fields:
+                        # Handle multiple values for same field
+                        if isinstance(fields[field_code], list):
+                            fields[field_code].append(field_value)
+                        else:
+                            fields[field_code] = [fields[field_code], field_value]
+                    else:
+                        fields[field_code] = field_value
+            elif current_field and line:
+                # Continuation of previous field
+                if isinstance(fields[current_field], list):
+                    fields[current_field][-1] += ' ' + line
+                else:
+                    fields[current_field] += ' ' + line
+        
+        # Convert to Citation object
+        try:
+            return self._fields_to_citation(fields)
+        except Exception as e:
+            logger.warning(f"Error converting fields to citation: {e}")
+            return None
+    
+    def _fields_to_citation(self, fields: Dict[str, Any]) -> Citation:
+        """
+        Convert parsed RIS fields to Citation object
+        
+        Args:
+            fields: Dictionary of parsed RIS fields
+            
+        Returns:
+            Citation object
+        """
+        # Extract title
+        title = fields.get('TI', '').strip()
+        if not title:
+            title = "No title available"
+        
+        # Extract abstract
+        abstract = fields.get('AB', fields.get('N2', '')).strip()
+        if not abstract:
+            abstract = "No abstract available"
+        
+        # Extract authors
+        authors = []
+        author_field = fields.get('AU', [])
+        if isinstance(author_field, str):
+            authors = [author_field]
+        elif isinstance(author_field, list):
+            authors = author_field
+        
+        # Clean author names
+        authors = [self._clean_author_name(author) for author in authors if author.strip()]
+        
+        # Extract journal
+        journal = fields.get('JO', fields.get('JF', '')).strip()
+        if not journal:
+            journal = "Unknown journal"
+        
+        # Extract year
+        year = self._extract_year(fields)
+        
+        # Extract DOI
+        doi = fields.get('DO', '').strip()
+        if doi and not doi.startswith('10.'):
+            doi = None
+        
+        # Extract keywords
+        keywords = []
+        keyword_field = fields.get('KW', [])
+        if isinstance(keyword_field, str):
+            keywords = [keyword_field]
+        elif isinstance(keyword_field, list):
+            keywords = keyword_field
+        
+        # Clean keywords
+        keywords = [kw.strip() for kw in keywords if kw.strip()]
+        
+        return Citation(
+            title=title,
+            abstract=abstract,
+            authors=authors,
+            journal=journal,
+            year=year,
+            doi=doi,
+            keywords=keywords if keywords else None
+        )
+    
+    def _clean_author_name(self, author: str) -> str:
+        """
+        Clean and format author name
+        
+        Args:
+            author: Raw author name
+            
+        Returns:
+            Cleaned author name
+        """
+        # Remove extra whitespace
+        author = re.sub(r'\s+', ' ', author.strip())
+        
+        # Handle common formatting issues
+        author = author.replace(',', ', ')
+        author = re.sub(r'\s*,\s*', ', ', author)
+        
+        return author
+    
+    def _extract_year(self, fields: Dict[str, Any]) -> int:
+        """
+        Extract publication year from RIS fields
+        
+        Args:
+            fields: Dictionary of RIS fields
+            
+        Returns:
+            Publication year as integer
+        """
+        # Try different year fields
+        year_fields = ['PY', 'DA', 'Y1']
+        
+        for field in year_fields:
+            if field in fields:
+                year_str = str(fields[field])
+                # Extract 4-digit year
+                year_match = re.search(r'(\d{4})', year_str)
+                if year_match:
+                    year = int(year_match.group(1))
+                    # Validate reasonable year range
+                    if 1900 <= year <= 2030:
+                        return year
+        
+        # Default year if not found
+        return 2000
+    
+    def export_citations(self, filepath: str, format: str = "csv") -> None:
+        """
+        Export parsed citations to file
+        
+        Args:
+            filepath: Output file path
+            format: Export format (csv, json, excel)
+        """
+        if not self.citations:
+            logger.warning("No citations to export")
+            return
+        
+        # Convert citations to DataFrame
+        data = []
+        for citation in self.citations:
+            data.append({
+                'id': citation.get_id(),
+                'title': citation.title,
+                'abstract': citation.abstract,
+                'authors': '; '.join(citation.authors),
+                'journal': citation.journal,
+                'year': citation.year,
+                'doi': citation.doi or '',
+                'keywords': '; '.join(citation.keywords) if citation.keywords else ''
+            })
+        
+        df = pd.DataFrame(data)
+        
+        # Export based on format
+        if format.lower() == "csv":
+            df.to_csv(filepath, index=False)
+        elif format.lower() == "json":
+            df.to_json(filepath, orient="records", indent=2)
+        elif format.lower() == "excel":
+            df.to_excel(filepath, index=False)
+        else:
+            raise ValueError(f"Unsupported export format: {format}")
+        
+        logger.info(f"Exported {len(data)} citations to {filepath}")
+
+class CitationManager:
+    """
+    Manager class for handling collections of citations
+    """
+    
+    def __init__(self):
+        self.citations: List[Citation] = []
+        self.parser = RISParser()
+    
+    def load_from_ris(self, filepath: str) -> int:
+        """
+        Load citations from RIS file
+        
+        Args:
+            filepath: Path to RIS file
+            
+        Returns:
+            Number of citations loaded
+        """
+        citations = self.parser.parse_ris_file(filepath)
+        self.citations.extend(citations)
+        return len(citations)
+    
+    def load_from_csv(self, filepath: str) -> int:
+        """
+        Load citations from CSV file
+        
+        Args:
+            filepath: Path to CSV file
+            
+        Returns:
+            Number of citations loaded
+        """
+        try:
+            df = pd.read_csv(filepath)
+            citations = []
+            
+            for _, row in df.iterrows():
+                citation = Citation(
+                    title=str(row.get('title', '')),
+                    abstract=str(row.get('abstract', '')),
+                    authors=str(row.get('authors', '')).split('; ') if row.get('authors') else [],
+                    journal=str(row.get('journal', '')),
+                    year=int(row.get('year', 2000)),
+                    doi=str(row.get('doi', '')) if row.get('doi') else None,
+                    keywords=str(row.get('keywords', '')).split('; ') if row.get('keywords') else None
+                )
+                citations.append(citation)
+            
+            self.citations.extend(citations)
+            logger.info(f"Loaded {len(citations)} citations from CSV")
+            return len(citations)
+            
+        except Exception as e:
+            logger.error(f"Error loading citations from CSV: {e}")
+            return 0
+    
+    def filter_citations(self, **kwargs) -> List[Citation]:
+        """
+        Filter citations based on criteria
+        
+        Args:
+            **kwargs: Filter criteria (year_min, year_max, journal, etc.)
+            
+        Returns:
+            Filtered list of citations
+        """
+        filtered = self.citations.copy()
+        
+        if 'year_min' in kwargs:
+            filtered = [c for c in filtered if c.year >= kwargs['year_min']]
+        
+        if 'year_max' in kwargs:
+            filtered = [c for c in filtered if c.year <= kwargs['year_max']]
+        
+        if 'journal' in kwargs:
+            journal_filter = kwargs['journal'].lower()
+            filtered = [c for c in filtered if journal_filter in c.journal.lower()]
+        
+        if 'has_abstract' in kwargs and kwargs['has_abstract']:
+            filtered = [c for c in filtered if c.abstract and c.abstract != "No abstract available"]
+        
+        return filtered
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """
+        Get statistics about the citation collection
+        
+        Returns:
+            Dictionary of statistics
+        """
+        if not self.citations:
+            return {}
+        
+        years = [c.year for c in self.citations]
+        journals = [c.journal for c in self.citations]
+        
+        return {
+            'total_citations': len(self.citations),
+            'year_range': (min(years), max(years)),
+            'unique_journals': len(set(journals)),
+            'citations_with_abstract': sum(1 for c in self.citations if c.abstract and c.abstract != "No abstract available"),
+            'citations_with_doi': sum(1 for c in self.citations if c.doi),
+            'average_authors_per_paper': sum(len(c.authors) for c in self.citations) / len(self.citations)
+        }
+    
+    def deduplicate(self) -> int:
+        """
+        Remove duplicate citations based on title similarity
+        
+        Returns:
+            Number of duplicates removed
+        """
+        original_count = len(self.citations)
+        
+        # Simple deduplication based on title similarity
+        unique_citations = []
+        seen_titles = set()
+        
+        for citation in self.citations:
+            # Normalize title for comparison
+            normalized_title = re.sub(r'[^\w\s]', '', citation.title.lower()).strip()
+            
+            if normalized_title not in seen_titles:
+                unique_citations.append(citation)
+                seen_titles.add(normalized_title)
+        
+        self.citations = unique_citations
+        duplicates_removed = original_count - len(self.citations)
+        
+        if duplicates_removed > 0:
+            logger.info(f"Removed {duplicates_removed} duplicate citations")
+        
+        return duplicates_removed

@@ -275,63 +275,133 @@ class CitationUploadResponse(BaseModel):
 # --- 4. Advanced File Parsing ---
 
 def parse_ris_file(content: str) -> List[Dict[str, Any]]:
-    """Enhanced RIS parser with better field extraction"""
+    """Robust RIS parser with comprehensive field extraction"""
     citations = []
-    current_citation: Dict[str, Any] = {}
     
-    lines = content.strip().split('\n')
-    for line in lines:
-        line = line.strip()
-        if not line:
+    # Split into individual records using ER delimiter
+    records = re.split(r'\nER\s*-\s*\n', content)
+    
+    for record in records:
+        record = record.strip()
+        if not record or record.startswith('ER'):
             continue
-            
-        if line.startswith('TY  -'):
-            if current_citation:
-                citations.append(current_citation)
-            current_citation = {'relevance_score': 0.5}
-        elif line.startswith('TI  -'):
-            current_citation['title'] = line[6:].strip()
-        elif line.startswith('AU  -'):
-            if 'authors' not in current_citation:
-                current_citation['authors'] = []
-            current_citation['authors'].append(line[6:].strip())
-        elif line.startswith('JO  -') or line.startswith('JF  -'):
-            current_citation['journal'] = line[6:].strip()
-        elif line.startswith('PY  -'):
-            try:
-                current_citation['year'] = int(line[6:].strip()[:4])
-            except:
-                pass
-        elif line.startswith('AB  -'):
-            current_citation['abstract'] = line[6:].strip()
-        elif line.startswith('DO  -'):
-            current_citation['doi'] = line[6:].strip()
-        elif line.startswith('KW  -'):
-            if 'keywords' not in current_citation:
-                current_citation['keywords'] = []
-            current_citation['keywords'].append(line[6:].strip())
-        elif line.startswith('ER  -'):
-            if current_citation:
-                citations.append(current_citation)
-                current_citation = {}
-    
-    if current_citation:
-        citations.append(current_citation)
-    
-    # Process and clean citations
-    for citation in citations:
-        if 'authors' in citation and isinstance(citation['authors'], list):
-            citation['authors'] = '; '.join(citation['authors'])
-        if 'keywords' in citation and isinstance(citation['keywords'], list):
-            citation['keywords'] = '; '.join(citation['keywords'])
         
-        # Calculate basic relevance score based on content completeness
-        score = 0.3  # Base score
-        if citation.get('title'): score += 0.2
-        if citation.get('abstract'): score += 0.3
-        if citation.get('authors'): score += 0.1
-        if citation.get('year'): score += 0.1
+        fields = {}
+        lines = record.split('\n')
+        current_field = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Check if line starts with RIS field code (XX  - content)
+            if re.match(r'^[A-Z0-9]{2}\s*-', line):
+                parts = line.split('-', 1)
+                if len(parts) == 2:
+                    field_code = parts[0].strip()
+                    field_value = parts[1].strip()
+                    current_field = field_code
+                    
+                    # Handle multiple values for same field
+                    if field_code in fields:
+                        if isinstance(fields[field_code], list):
+                            fields[field_code].append(field_value)
+                        else:
+                            fields[field_code] = [fields[field_code], field_value]
+                    else:
+                        fields[field_code] = field_value
+            elif current_field and line:
+                # Continuation of previous field
+                if isinstance(fields[current_field], list):
+                    fields[current_field][-1] += ' ' + line
+                else:
+                    fields[current_field] += ' ' + line
+        
+        # Convert to citation format
+        citation = {}
+        
+        # Extract title
+        title = fields.get('TI', '').strip()
+        citation['title'] = title if title else "No title available"
+        
+        # Extract abstract (try AB first, then N2 as fallback)
+        abstract = fields.get('AB', fields.get('N2', '')).strip()
+        citation['abstract'] = abstract if abstract else "No abstract available"
+        
+        # Extract authors
+        authors = []
+        author_field = fields.get('AU', [])
+        if isinstance(author_field, str):
+            authors = [author_field]
+        elif isinstance(author_field, list):
+            authors = author_field
+        
+        # Clean and format author names
+        cleaned_authors = []
+        for author in authors:
+            if author.strip():
+                # Clean author name: normalize whitespace and handle commas
+                author = re.sub(r'\s+', ' ', author.strip())
+                author = re.sub(r'\s*,\s*', ', ', author)
+                cleaned_authors.append(author)
+        
+        citation['authors'] = '; '.join(cleaned_authors) if cleaned_authors else "Unknown"
+        
+        # Extract journal (try JO first, then JF as fallback)
+        journal = fields.get('JO', fields.get('JF', '')).strip()
+        citation['journal'] = journal if journal else "Unknown journal"
+        
+        # Extract year from multiple possible fields
+        year = None
+        year_fields = ['PY', 'DA', 'Y1']
+        for field in year_fields:
+            if field in fields:
+                year_str = str(fields[field])
+                # Extract 4-digit year using regex
+                year_match = re.search(r'(\d{4})', year_str)
+                if year_match:
+                    year = int(year_match.group(1))
+                    # Validate reasonable year range
+                    if 1900 <= year <= 2030:
+                        break
+        citation['year'] = year if year else 2000
+        
+        # Extract DOI
+        doi = fields.get('DO', '').strip()
+        # Validate DOI format (should start with 10.)
+        if doi and not doi.startswith('10.'):
+            doi = None
+        citation['doi'] = doi
+        
+        # Extract keywords
+        keywords = []
+        keyword_field = fields.get('KW', [])
+        if isinstance(keyword_field, str):
+            keywords = [keyword_field]
+        elif isinstance(keyword_field, list):
+            keywords = keyword_field
+        
+        # Clean keywords and join with semicolons
+        cleaned_keywords = [kw.strip() for kw in keywords if kw.strip()]
+        citation['keywords'] = '; '.join(cleaned_keywords) if cleaned_keywords else None
+        
+        # Calculate relevance score based on content completeness
+        score = 0.2  # Base score
+        if citation.get('title') and citation['title'] != "No title available":
+            score += 0.3
+        if citation.get('abstract') and citation['abstract'] != "No abstract available":
+            score += 0.3
+        if citation.get('authors') and citation['authors'] != "Unknown":
+            score += 0.1
+        if citation.get('year') and citation['year'] != 2000:
+            score += 0.05
+        if citation.get('doi'):
+            score += 0.05
+        
         citation['relevance_score'] = min(score, 1.0)
+        
+        citations.append(citation)
     
     return citations
 

@@ -105,6 +105,23 @@ uvicorn main:app --host 0.0.0.0 --port 5000
 
 ## Recent Changes
 
+### June 19, 2025 - Advanced Search & Filtering + RIS Parser Enhancement
+- **Advanced Search Interface**: Comprehensive search system with multiple criteria
+  - Search by title, authors, journal, publication year, keywords, and abstract content
+  - Year range search supporting formats like "2020-2024" or single years
+  - Real-time search highlighting of matching terms in results
+  - Filter chips showing active search criteria with easy removal
+  - Sorting controls for relevance, title, authors, year, journal, decision, and confidence
+  - Search results info panel with match statistics and guidance
+- **Robust RIS Parser**: Integrated enhanced citation management system
+  - Comprehensive field extraction supporting all standard RIS fields
+  - Improved author name cleaning and formatting
+  - Better handling of multiple values and field continuations
+  - Enhanced year extraction from multiple date fields with validation
+  - DOI format validation and keyword processing
+  - Relevance scoring based on content completeness
+- **Database Schema Fix**: Added missing screening_mode column to resolve upload errors
+
 ### June 19, 2025 - Enhanced Multi-Provider LLM Support
 - **Added Trusted Provider Tiers**: Organized 8 LLM providers into production-ready tiers
   - Tier 1 (Recommended): OpenAI GPT-4o, Anthropic Claude 3.5 Sonnet
