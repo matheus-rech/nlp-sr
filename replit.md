@@ -105,6 +105,22 @@ uvicorn main:app --host 0.0.0.0 --port 5000
 
 ## Recent Changes
 
+### June 19, 2025 - Enhanced Screening Decision Structure
+- **Improved Screening Output Schema**: Enhanced the ScreeningDecision model with better structured outputs
+  - Added evidence_quotes field for specific citation quotes supporting decisions
+  - Enhanced criteria_assessment with detailed per-criterion evaluation (meets/does_not_meet/unclear)
+  - Added quality_indicators for structured quality assessment (sample_size_adequate, methodology_clear, outcomes_relevant)
+  - Included processing_metadata field for timing and model information tracking
+  - Added "uncertain" decision option alongside include/exclude for cases requiring human review
+- **Quality Assessment Integration**: Structured quality indicators provide standardized assessment framework
+  - Sample size adequacy evaluation based on available information
+  - Methodology clarity assessment for study design evaluation
+  - Outcome relevance scoring aligned with systematic review objectives
+- **Evidence-Based Decision Making**: Enhanced reasoning with specific quote extraction
+  - Direct quotes from citations supporting inclusion/exclusion decisions
+  - Improved traceability of AI reasoning back to source material
+  - Better support for human reviewers to validate AI decisions
+
 ### June 19, 2025 - Additional Citation Format Support
 - **Enhanced Citation Format Support**: Added comprehensive support for major reference management systems
   - EndNote format support (.enw tagged format and XML)

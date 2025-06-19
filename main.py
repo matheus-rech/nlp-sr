@@ -241,9 +241,9 @@ class LLMConfig(BaseModel):
 
 # Structured Output Schema with Pydantic
 class ScreeningDecision(LangChainBaseModel):
-    """Structured screening decision output"""
-    decision: Literal["include", "exclude"] = Field(
-        description="Final decision: 'include' to include the study, 'exclude' to exclude it"
+    """Enhanced structured screening decision output"""
+    decision: Literal["include", "exclude", "uncertain"] = Field(
+        description="Final decision: 'include' to include the study, 'exclude' to exclude it, 'uncertain' for review"
     )
     confidence: float = Field(
         ge=0, le=100, 
@@ -251,6 +251,28 @@ class ScreeningDecision(LangChainBaseModel):
     )
     reasoning: str = Field(
         description="Detailed explanation of the decision with specific criteria references"
+    )
+    evidence_quotes: List[str] = Field(
+        description="Specific quotes from the citation supporting the decision",
+        default_factory=list
+    )
+    criteria_assessment: Dict[str, str] = Field(
+        description="Assessment of each criterion (meets/does_not_meet/unclear)",
+        default_factory=lambda: {
+            "population": "unclear",
+            "intervention": "unclear",
+            "comparison": "unclear",
+            "outcome": "unclear",
+            "study_design": "unclear"
+        }
+    )
+    quality_indicators: Dict[str, bool] = Field(
+        description="Quality assessment indicators",
+        default_factory=lambda: {
+            "sample_size_adequate": False,
+            "methodology_clear": False,
+            "outcomes_relevant": False
+        }
     )
     pico_scores: Dict[str, float] = Field(
         description="PICO component scores from 0.0-1.0",
@@ -270,6 +292,10 @@ class ScreeningDecision(LangChainBaseModel):
     key_findings: List[str] = Field(
         description="Key findings or limitations identified",
         default_factory=list
+    )
+    processing_metadata: Dict[str, Any] = Field(
+        description="Processing metadata including timing and model info",
+        default_factory=dict
     )
 
 class CitationUploadResponse(BaseModel):
