@@ -1054,13 +1054,14 @@ async def get_frontend():
             display: flex;
             flex-direction: column;
             overflow-y: auto;
-            max-height: calc(100vh - 120px);
+            height: calc(100vh - 120px);
         }
 
         .criteria-section {
             padding: 1.5rem;
             border-bottom: 1px solid #e0e0e0;
-            flex-shrink: 0;
+            overflow-y: auto;
+            max-height: 40vh;
         }
 
         .criteria-section h3 {
@@ -1099,7 +1100,8 @@ async def get_frontend():
         .llm-config {
             padding: 1.5rem;
             border-bottom: 1px solid #e0e0e0;
-            flex-shrink: 0;
+            overflow-y: auto;
+            max-height: 30vh;
         }
 
         .llm-config h4 {
@@ -1178,7 +1180,8 @@ async def get_frontend():
         .controls {
             padding: 1.5rem;
             background: #f8f9fa;
-            flex-shrink: 0;
+            border-top: 1px solid #e0e0e0;
+            min-height: 200px;
         }
 
         .upload-area {
@@ -1406,11 +1409,27 @@ async def get_frontend():
 
         /* Metrics Panel */
         .metrics-panel {
-            margin: 2rem 0;
+            margin: 1rem;
             padding: 1.5rem;
             border: 1px solid #ddd;
             border-radius: 8px;
             background-color: #f8f9fa;
+        }
+
+        .export-btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .export-btn:hover {
+            background: #218838;
         }
 
         .metrics-grid {

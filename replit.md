@@ -105,6 +105,18 @@ uvicorn main:app --host 0.0.0.0 --port 5000
 
 ## Recent Changes
 
+### June 19, 2025 - Fixed Interface Layout & Accessibility Issues
+- **Resolved CSS Layout Problems**: Fixed interface structure so all elements are properly accessible
+  - Made criteria configuration section scrollable with proper height constraints
+  - Fixed LLM configuration panels to be accessible within the left sidebar
+  - Ensured upload/export controls are visible at the bottom of the left panel
+  - Restructured main content area to properly display citations and metrics panels
+- **Improved User Experience**: All interface elements now properly visible and functional
+  - Users can now access all PICO-TT criteria configuration fields
+  - Upload area and export buttons are clearly visible and accessible
+  - Citations carousel and metrics panels display correctly in the main content area
+  - Fixed scrolling behavior throughout the interface for better navigation
+
 ### June 19, 2025 - Complete Citation Display & Metrics Integration
 - **Fixed JavaScript Syntax Errors**: Resolved function call issues preventing application loading
   - Fixed missing `prompt_variables` argument in LLM test connection function
