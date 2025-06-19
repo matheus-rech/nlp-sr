@@ -105,6 +105,22 @@ uvicorn main:app --host 0.0.0.0 --port 5000
 
 ## Recent Changes
 
+### June 19, 2025 - Advanced Dual LLM Judgment System Integration
+- **Intelligent Conflict Resolution**: Sophisticated agreement scoring algorithm
+  - Multi-factor analysis: decision agreement, confidence alignment, PICO scores, quality assessment
+  - Three-tier resolution: consensus (80%+ agreement), higher confidence (60-80%), conflict detection (<60%)
+  - Automated resolution strategies with detailed reasoning and methodology tracking
+- **Performance Analytics System**: Comprehensive LLM optimization framework
+  - Real-time tracking: response times, success rates, confidence scores, token usage
+  - Provider comparison metrics with cost analysis and quality benchmarking
+  - Automated recommendations for model selection and performance optimization
+  - Session-based analytics with historical performance data
+- **Enhanced Screening Intelligence**: Advanced dual AI evaluation with metadata
+  - Performance tracking for each LLM response with timing and token metrics
+  - Agreement score calculation using sophisticated multi-dimensional analysis
+  - Conflict metadata storage including resolution method and reasoning
+  - Quality-based model selection with specialization tracking
+
 ### June 19, 2025 - Advanced Search & Filtering + RIS Parser Enhancement
 - **Advanced Search Interface**: Comprehensive search system with multiple criteria
   - Search by title, authors, journal, publication year, keywords, and abstract content
@@ -120,7 +136,7 @@ uvicorn main:app --host 0.0.0.0 --port 5000
   - Enhanced year extraction from multiple date fields with validation
   - DOI format validation and keyword processing
   - Relevance scoring based on content completeness
-- **Database Schema Fix**: Added missing screening_mode column to resolve upload errors
+- **Database Schema Fix**: Added missing screening_mode and relevance_score columns to resolve upload errors
 
 ### June 19, 2025 - Enhanced Multi-Provider LLM Support
 - **Added Trusted Provider Tiers**: Organized 8 LLM providers into production-ready tiers
