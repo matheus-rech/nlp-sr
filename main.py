@@ -2893,13 +2893,115 @@ HTML_CONTENT = """
                 const result = await response.json();
                 currentProject = result.project_id;
                 
-                // Fetch the uploaded citations
-                await loadReferences();
-                updateDisplay();
+                // Display uploaded citations immediately using carousel
+                if (result.citations && result.citations.length > 0) {
+                    references = result.citations;
+                    displayCitationCarousel(result.citations);
+                    updateDisplay();
+                } else {
+                    // Fallback to fetching if no citations in response
+                    await loadReferences();
+                    updateDisplay();
+                }
+                
                 updateStartButton();
                 
             } catch (error) {
                 alert('Error uploading files: ' + error.message);
+            }
+        }
+
+        function displayCitationCarousel(citations) {
+            const container = document.getElementById('referencesContainer');
+            if (!container) return;
+
+            // Create carousel header
+            const header = document.createElement('div');
+            header.className = 'citation-carousel-header';
+            header.innerHTML = `
+                <h3>📚 Uploaded Citations (${citations.length})</h3>
+                <p>Your citations are ready for screening. Review them below:</p>
+            `;
+            header.style.cssText = 'margin-bottom: 1rem; padding: 1rem; background: #e8f5e8; border-radius: 8px; border-left: 4px solid #28a745;';
+
+            // Create carousel container
+            const carousel = document.createElement('div');
+            carousel.className = 'citation-carousel';
+            carousel.style.cssText = 'display: flex; gap: 1rem; overflow-x: auto; padding: 1rem 0; scroll-behavior: smooth;';
+
+            citations.forEach((citation, index) => {
+                const card = document.createElement('div');
+                card.className = 'citation-card';
+                card.style.cssText = `
+                    min-width: 320px; max-width: 380px; padding: 1rem; border: 1px solid #ddd; 
+                    border-radius: 8px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    transition: transform 0.2s, box-shadow 0.2s;
+                `;
+
+                // Truncate long titles and abstracts for display
+                const truncatedTitle = citation.title.length > 80 ? 
+                    citation.title.substring(0, 80) + '...' : citation.title;
+                const truncatedAbstract = citation.abstract.length > 150 ? 
+                    citation.abstract.substring(0, 150) + '...' : citation.abstract;
+
+                card.innerHTML = `
+                    <div class="citation-header" style="margin-bottom: 0.75rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #2c3e50; font-size: 1rem; line-height: 1.3;">${truncatedTitle}</h4>
+                        <div style="font-size: 0.85rem; color: #6c757d;">
+                            <span><strong>Authors:</strong> ${citation.authors || 'Unknown'}</span><br>
+                            <span><strong>Journal:</strong> ${citation.journal || 'Unknown'}</span>
+                            <span style="margin-left: 1rem;"><strong>Year:</strong> ${citation.year || 'N/A'}</span>
+                        </div>
+                    </div>
+                    <div class="citation-abstract" style="margin-bottom: 0.75rem;">
+                        <p style="font-size: 0.9rem; color: #495057; margin: 0; line-height: 1.4;">${truncatedAbstract}</p>
+                    </div>
+                    <div class="citation-footer" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #6c757d;">
+                        <span class="relevance-score">Relevance: ${Math.round((citation.relevance_score || 0.5) * 100)}%</span>
+                        <span class="citation-status" style="background: #28a745; color: white; padding: 2px 8px; border-radius: 12px; margin-left: auto;">Ready</span>
+                    </div>
+                `;
+
+                // Add hover effects
+                card.addEventListener('mouseenter', () => {
+                    card.style.transform = 'translateY(-2px)';
+                    card.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+                });
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = 'translateY(0)';
+                    card.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                });
+
+                carousel.appendChild(card);
+            });
+
+            // Clear container and add new content
+            container.innerHTML = '';
+            container.appendChild(header);
+            container.appendChild(carousel);
+
+            // Add scroll buttons if needed
+            if (citations.length > 3) {
+                const scrollControls = document.createElement('div');
+                scrollControls.className = 'carousel-controls';
+                scrollControls.style.cssText = 'text-align: center; margin-top: 1rem;';
+                scrollControls.innerHTML = `
+                    <button onclick="scrollCarousel('left')" style="margin-right: 0.5rem; padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">← Previous</button>
+                    <button onclick="scrollCarousel('right')" style="padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Next →</button>
+                `;
+                container.appendChild(scrollControls);
+            }
+        }
+
+        function scrollCarousel(direction) {
+            const carousel = document.querySelector('.citation-carousel');
+            if (!carousel) return;
+            
+            const scrollAmount = 340; // Width of one card plus gap
+            if (direction === 'left') {
+                carousel.scrollLeft -= scrollAmount;
+            } else {
+                carousel.scrollLeft += scrollAmount;
             }
         }
 
@@ -3896,7 +3998,7 @@ async def get_providers():
 
 @app.post("/api/upload")
 async def upload_files(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
-    """Enhanced file upload with better parsing"""
+    """Enhanced file upload with immediate citation display"""
     project = Project(
         name=f"Otto-SR Project - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         screening_mode="single"
@@ -3906,6 +4008,7 @@ async def upload_files(files: List[UploadFile] = File(...), db: Session = Depend
     db.refresh(project)
     
     total_citations = 0
+    uploaded_citations = []
     
     for file in files:
         try:
@@ -3931,6 +4034,26 @@ async def upload_files(files: List[UploadFile] = File(...), db: Session = Depend
                     relevance_score=citation_data.get('relevance_score', 0.5)
                 )
                 db.add(citation)
+                db.flush()  # Get the ID before commit
+                
+                # Format abstract for display
+                abstract = citation_data.get('abstract', '')
+                display_abstract = abstract[:200] + "..." if len(abstract) > 200 else abstract
+                
+                # Add to display list with proper formatting
+                uploaded_citations.append({
+                    "id": str(citation.id),
+                    "title": citation.title,
+                    "authors": citation.authors,
+                    "journal": citation.journal,
+                    "year": citation.year,
+                    "abstract": display_abstract,
+                    "full_abstract": abstract,
+                    "doi": citation.doi,
+                    "keywords": citation.keywords,
+                    "relevance_score": round(citation.relevance_score, 2),
+                    "status": "uploaded"
+                })
                 total_citations += 1
         
         except Exception as e:
@@ -3947,11 +4070,13 @@ async def upload_files(files: List[UploadFile] = File(...), db: Session = Depend
     db.add(activity)
     db.commit()
     
-    return CitationUploadResponse(
-        project_id=str(project.id),
-        citations_count=total_citations,
-        message=f"Successfully uploaded {total_citations} citations"
-    )
+    return {
+        "project_id": str(project.id),
+        "citations_count": total_citations,
+        "message": f"Successfully uploaded {total_citations} citations",
+        "citations": uploaded_citations,  # Include citation data for immediate carousel display
+        "status": "success"
+    }
 
 @app.get("/api/projects/{project_id}/citations")
 async def get_citations(project_id: str, db: Session = Depends(get_db)):
