@@ -1,10 +1,10 @@
-# Otto-SR: Complete Single-File Application
+# Otto-SR: Production LLM Screening Tool v3.0
 
 ## Overview
 
-Otto-SR is a comprehensive web application for systematic review screening built as a single-file FastAPI application. The application combines a Python backend with an embedded HTML/CSS/JavaScript frontend to provide a complete solution for academic research screening workflows.
+Otto-SR is a comprehensive systematic review screening application built as a single-file FastAPI application with advanced multi-provider LLM support. The application combines a Python backend with an embedded HTML/CSS/JavaScript frontend to provide a complete solution for academic research screening workflows with sophisticated AI assistance.
 
-The application uses a monolithic single-file architecture where both the server-side logic and client-side interface are contained within `main.py`, making it easy to deploy and maintain.
+The application uses a monolithic single-file architecture where both the server-side logic and client-side interface are contained within `main.py`, making it easy to deploy and maintain while supporting multiple LLM providers through LangChain integration.
 
 ## System Architecture
 
@@ -12,12 +12,14 @@ The application uses a monolithic single-file architecture where both the server
 - **Monolithic Single-File**: All application logic, including both backend API and frontend UI, is contained in a single Python file
 - **Full-Stack Web Application**: FastAPI backend with embedded HTML/CSS/JavaScript frontend
 - **Database-Driven**: PostgreSQL database for persistent data storage
-- **AI-Enhanced**: Integration with OpenAI's language models for intelligent screening assistance
+- **Multi-Provider AI-Enhanced**: Integration with multiple LLM providers through LangChain for intelligent screening assistance
+- **Structured Output Processing**: Pydantic-based structured outputs for consistent AI responses
 
 ### Technology Stack
 - **Backend**: FastAPI (Python 3.11+)
 - **Database**: PostgreSQL with SQLAlchemy ORM
-- **AI Integration**: LangChain with OpenAI GPT models
+- **AI Integration**: LangChain with multiple LLM providers (OpenAI, Anthropic, Ollama, LM Studio, Cohere, Hugging Face)
+- **Structured Outputs**: Pydantic models for consistent AI response formatting
 - **Frontend**: Vanilla HTML/CSS/JavaScript (embedded)
 - **File Handling**: aiofiles for async file operations
 
@@ -26,24 +28,38 @@ The application uses a monolithic single-file architecture where both the server
 ### Backend Services
 1. **FastAPI Application**: Main web server handling HTTP requests
 2. **SQLAlchemy Models**: Database schema definitions for systematic review data
-3. **LangChain Integration**: AI-powered screening and analysis capabilities
-4. **File Upload System**: Support for research paper uploads and processing
-5. **Background Tasks**: Async processing for long-running operations
+3. **Multi-Provider LLM Integration**: AI-powered screening with support for multiple providers
+4. **File Upload System**: Enhanced parsing for RIS and XML citation formats
+5. **Background Tasks**: Async processing for long-running screening operations
+6. **Structured Output Processing**: Pydantic-based AI response validation
 
 ### Database Layer
 - **SQLAlchemy ORM**: Object-relational mapping for database operations  
 - **PostgreSQL**: Primary data store for application data
 - **Connection Management**: Session-based database connections with proper cleanup
+- **Activity Logging**: Comprehensive tracking of screening activities
 
-### AI Integration
-- **OpenAI GPT Models**: Language model integration for intelligent screening
-- **LangChain Framework**: Structured prompting and response handling
-- **Async Processing**: Non-blocking AI operations for better user experience
+### Multi-Provider AI Integration
+- **LangChain Framework**: Unified interface for multiple LLM providers
+- **Supported Providers**: OpenAI, Anthropic (Claude), Ollama, LM Studio, Cohere, Hugging Face
+- **Dynamic Provider Factory**: Automatic LLM instance creation based on provider configuration
+- **Structured Prompts**: Template-based prompting with PICO-TT criteria integration
+- **Pydantic Output Parsing**: Consistent structured responses across all providers
+- **Dual Screening Strategy**: Conservative vs pragmatic AI approaches for conflict detection
+
+### Advanced Screening Features
+- **PICO-TT Criteria Configuration**: Comprehensive systematic review criteria setup
+- **Multiple Screening Modes**: Single citation, batch processing, and AI-assisted workflows
+- **Real-time Progress Tracking**: Live updates during screening processes
+- **Conflict Detection**: Automatic identification of AI disagreements for human review
+- **Relevance Scoring**: Automated assessment of citation completeness and relevance
 
 ### Frontend Interface
 - **Embedded HTML**: Complete user interface served directly from the Python application
-- **JavaScript**: Client-side interactivity and API communication
+- **Dynamic Provider Selection**: JavaScript-driven LLM provider configuration
+- **Real-time Updates**: Progress tracking and status monitoring
 - **Responsive Design**: CSS styling for cross-device compatibility
+- **File Drag-and-Drop**: Enhanced file upload experience
 
 ## Data Flow
 

@@ -1667,12 +1667,85 @@ HTML_CONTENT = """
             ai1: { connected: false },
             ai2: { connected: false }
         };
+        let providerConfigs = {};
 
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('fileInput').addEventListener('change', handleFileUpload);
             setupDragAndDrop();
+            loadProviderConfigurations();
         });
+
+        // --- Provider Management ---
+        async function loadProviderConfigurations() {
+            try {
+                const response = await fetch('/api/providers');
+                const data = await response.json();
+                providerConfigs = data.providers;
+                
+                // Initialize provider dropdowns and default values
+                updateProviderModels('ai1');
+                updateProviderModels('ai2');
+            } catch (error) {
+                console.error('Error loading provider configurations:', error);
+            }
+        }
+
+        function updateProviderModels(aiModel) {
+            const providerSelect = document.getElementById(`${aiModel}Provider`);
+            const modelSelect = document.getElementById(`${aiModel}Model`);
+            const endpointInput = document.getElementById(`${aiModel}Endpoint`);
+            const apiKeyInput = document.getElementById(`${aiModel}ApiKey`);
+            
+            const selectedProvider = providerSelect.value;
+            const providerConfig = providerConfigs[selectedProvider];
+            
+            if (!providerConfig) return;
+            
+            // Update model options
+            modelSelect.innerHTML = '';
+            providerConfig.models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                if (model === providerConfig.default_model) {
+                    option.selected = true;
+                }
+                modelSelect.appendChild(option);
+            });
+            
+            // Update endpoint if provider has default
+            if (providerConfig.default_endpoint) {
+                endpointInput.value = providerConfig.default_endpoint;
+            } else {
+                // Set default endpoints for known providers
+                const defaultEndpoints = {
+                    'openai': 'https://api.openai.com/v1/chat/completions',
+                    'anthropic': 'https://api.anthropic.com/v1/messages',
+                    'cohere': 'https://api.cohere.ai/v1/chat',
+                    'huggingface': 'https://api-inference.huggingface.co/models/'
+                };
+                endpointInput.value = defaultEndpoints[selectedProvider] || '';
+            }
+            
+            // Show/hide API key field based on provider requirements
+            const apiKeyRow = apiKeyInput.closest('.config-row');
+            if (providerConfig.requires_api_key) {
+                apiKeyRow.style.display = 'flex';
+                apiKeyInput.placeholder = `Enter ${providerConfig.display_name} API key`;
+            } else {
+                apiKeyRow.style.display = 'none';
+                apiKeyInput.value = '';
+            }
+            
+            // Reset connection status
+            const statusElement = document.getElementById(`${aiModel}Status`);
+            statusElement.textContent = 'Not Connected';
+            statusElement.className = 'api-status disconnected';
+            llmConfigs[aiModel].connected = false;
+            
+            updateStartButton();
+        }
 
         function setupDragAndDrop() {
             const uploadArea = document.getElementById('uploadArea');
