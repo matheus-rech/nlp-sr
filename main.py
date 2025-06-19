@@ -2909,21 +2909,34 @@ async def get_frontend():
             displayCitations();
         }
 
-        // Initialize filteredCitations when citations are loaded
-        let uploadedCitations = [];
-        let filteredCitations = [];
-        let currentSortField = 'relevance';
-        let currentSortDirection = 'desc';
-                    case 'authors':
-                        return (a.authors || '').localeCompare(b.authors || '');
-                    case 'journal':
-                        return (a.journal || '').localeCompare(b.journal || '');
-                    default:
-                        return 0;
+        function setScreeningMode(mode) {
+            screeningMode = mode;
+            
+            // Update mode button states
+            const modeButtons = document.querySelectorAll('.mode-button');
+            modeButtons.forEach(btn => {
+                if (btn && btn.dataset && btn.dataset.mode === mode) {
+                    btn.classList.add('active');
+                } else if (btn) {
+                    btn.classList.remove('active');
                 }
             });
             
-            displayCitations();
+            // Update UI based on mode
+            updateScreeningModeUI();
+        }
+
+        function updateScreeningModeUI() {
+            const dualAiSection = document.getElementById('dualAiSection');
+            const singleAiSection = document.getElementById('singleAiSection');
+            
+            if (screeningMode === 'dual') {
+                if (dualAiSection) dualAiSection.style.display = 'block';
+                if (singleAiSection) singleAiSection.style.display = 'none';
+            } else {
+                if (dualAiSection) dualAiSection.style.display = 'none';
+                if (singleAiSection) singleAiSection.style.display = 'block';
+            }
         }
 
         function updateMetricsDisplay() {
