@@ -649,6 +649,266 @@ def parse_xml_file(content: str) -> List[Dict[str, Any]]:
     
     return citations
 
+def parse_endnote_file(content: str) -> List[Dict[str, Any]]:
+    """Parse EndNote tagged format (.enw) or XML format"""
+    citations = []
+    
+    try:
+        if content.startswith('%'):
+            # EndNote tagged format (.enw)
+            records = content.split('\n\n')
+            
+            for record in records:
+                if not record.strip():
+                    continue
+                    
+                citation = {}
+                lines = record.strip().split('\n')
+                
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    if line.startswith('%T '):
+                        citation['title'] = line[3:].strip()
+                    elif line.startswith('%A '):
+                        authors = citation.get('authors', '')
+                        new_author = line[3:].strip()
+                        citation['authors'] = f"{authors}; {new_author}" if authors else new_author
+                    elif line.startswith('%J '):
+                        citation['journal'] = line[3:].strip()
+                    elif line.startswith('%D '):
+                        try:
+                            year_match = re.search(r'\d{4}', line[3:])
+                            if year_match:
+                                citation['year'] = int(year_match.group())
+                        except:
+                            pass
+                    elif line.startswith('%X '):
+                        citation['abstract'] = line[3:].strip()
+                    elif line.startswith('%R '):
+                        citation['doi'] = line[3:].strip()
+                    elif line.startswith('%K '):
+                        keywords = citation.get('keywords', '')
+                        new_keyword = line[3:].strip()
+                        citation['keywords'] = f"{keywords}; {new_keyword}" if keywords else new_keyword
+                
+                # Calculate relevance score
+                score = 0.3
+                if citation.get('title'): score += 0.2
+                if citation.get('abstract'): score += 0.3
+                if citation.get('authors'): score += 0.1
+                if citation.get('year'): score += 0.1
+                citation['relevance_score'] = min(score, 1.0)
+                
+                if citation.get('title'):
+                    citations.append(citation)
+        else:
+            # EndNote XML format - use existing XML parser
+            citations = parse_xml_file(content)
+            
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error parsing EndNote format: {str(e)}")
+    
+    return citations
+
+def parse_mendeley_file(content: str) -> List[Dict[str, Any]]:
+    """Parse Mendeley BibTeX format (.bib)"""
+    citations = []
+    
+    try:
+        # Split into individual entries
+        entries = re.split(r'@\w+\s*\{', content)[1:]  # Skip empty first element
+        
+        for entry in entries:
+            if not entry.strip():
+                continue
+                
+            citation = {}
+            
+            # Extract fields using regex
+            title_match = re.search(r'title\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
+            if title_match:
+                citation['title'] = title_match.group(1).strip()
+            
+            author_match = re.search(r'author\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
+            if author_match:
+                authors = author_match.group(1).strip()
+                # Clean up BibTeX author format
+                authors = re.sub(r'\s+and\s+', '; ', authors)
+                citation['authors'] = authors
+            
+            journal_match = re.search(r'journal\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
+            if journal_match:
+                citation['journal'] = journal_match.group(1).strip()
+            
+            year_match = re.search(r'year\s*=\s*[{"]?(\d{4})[}"]?', entry, re.IGNORECASE)
+            if year_match:
+                citation['year'] = int(year_match.group(1))
+            
+            abstract_match = re.search(r'abstract\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
+            if abstract_match:
+                citation['abstract'] = abstract_match.group(1).strip()
+            
+            doi_match = re.search(r'doi\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE)
+            if doi_match:
+                citation['doi'] = doi_match.group(1).strip()
+            
+            keywords_match = re.search(r'keywords\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
+            if keywords_match:
+                keywords = keywords_match.group(1).strip()
+                # Clean up BibTeX keywords format
+                keywords = re.sub(r',\s*', '; ', keywords)
+                citation['keywords'] = keywords
+            
+            # Calculate relevance score
+            score = 0.3
+            if citation.get('title'): score += 0.2
+            if citation.get('abstract'): score += 0.3
+            if citation.get('authors'): score += 0.1
+            if citation.get('year'): score += 0.1
+            citation['relevance_score'] = min(score, 1.0)
+            
+            if citation.get('title'):
+                citations.append(citation)
+                
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error parsing Mendeley/BibTeX format: {str(e)}")
+    
+    return citations
+
+def parse_zotero_file(content: str) -> List[Dict[str, Any]]:
+    """Parse Zotero RDF format (.rdf) or CSL JSON format"""
+    citations = []
+    
+    try:
+        if content.strip().startswith('<?xml') or '<rdf:RDF' in content:
+            # Zotero RDF format
+            root = ET.fromstring(content)
+            
+            # Define namespaces
+            namespaces = {
+                'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+                'dc': 'http://purl.org/dc/elements/1.1/',
+                'dcterms': 'http://purl.org/dc/terms/',
+                'z': 'http://www.zotero.org/namespaces/export#'
+            }
+            
+            # Find all items
+            items = root.findall('.//rdf:Description[@rdf:about]', namespaces)
+            
+            for item in items:
+                citation = {}
+                
+                # Extract title
+                title_elem = item.find('.//dc:title', namespaces)
+                if title_elem is not None and title_elem.text:
+                    citation['title'] = title_elem.text.strip()
+                
+                # Extract authors
+                creator_elems = item.findall('.//dc:creator', namespaces)
+                if creator_elems:
+                    authors = [elem.text.strip() for elem in creator_elems if elem.text]
+                    citation['authors'] = '; '.join(authors)
+                
+                # Extract source/journal
+                source_elem = item.find('.//dc:source', namespaces)
+                if source_elem is not None and source_elem.text:
+                    citation['journal'] = source_elem.text.strip()
+                
+                # Extract date/year
+                date_elem = item.find('.//dc:date', namespaces)
+                if date_elem is not None and date_elem.text:
+                    year_match = re.search(r'\d{4}', date_elem.text)
+                    if year_match:
+                        citation['year'] = int(year_match.group())
+                
+                # Extract abstract
+                description_elem = item.find('.//dc:description', namespaces)
+                if description_elem is not None and description_elem.text:
+                    citation['abstract'] = description_elem.text.strip()
+                
+                # Extract identifier (DOI)
+                identifier_elem = item.find('.//dc:identifier', namespaces)
+                if identifier_elem is not None and identifier_elem.text:
+                    identifier = identifier_elem.text.strip()
+                    if 'doi' in identifier.lower() or identifier.startswith('10.'):
+                        citation['doi'] = identifier
+                
+                # Extract subjects as keywords
+                subject_elems = item.findall('.//dc:subject', namespaces)
+                if subject_elems:
+                    keywords = [elem.text.strip() for elem in subject_elems if elem.text]
+                    citation['keywords'] = '; '.join(keywords)
+                
+                # Calculate relevance score
+                score = 0.3
+                if citation.get('title'): score += 0.2
+                if citation.get('abstract'): score += 0.3
+                if citation.get('authors'): score += 0.1
+                if citation.get('year'): score += 0.1
+                citation['relevance_score'] = min(score, 1.0)
+                
+                if citation.get('title'):
+                    citations.append(citation)
+        else:
+            # Try CSL JSON format
+            try:
+                data = json.loads(content)
+                if isinstance(data, list):
+                    for item in data:
+                        citation = {}
+                        
+                        if 'title' in item:
+                            citation['title'] = item['title']
+                        
+                        if 'author' in item:
+                            authors = []
+                            for author in item['author']:
+                                if isinstance(author, dict):
+                                    if 'family' in author and 'given' in author:
+                                        authors.append(f"{author['family']}, {author['given']}")
+                                    elif 'family' in author:
+                                        authors.append(author['family'])
+                                elif isinstance(author, str):
+                                    authors.append(author)
+                            citation['authors'] = '; '.join(authors)
+                        
+                        if 'container-title' in item:
+                            citation['journal'] = item['container-title']
+                        
+                        if 'issued' in item and 'date-parts' in item['issued']:
+                            try:
+                                citation['year'] = item['issued']['date-parts'][0][0]
+                            except:
+                                pass
+                        
+                        if 'abstract' in item:
+                            citation['abstract'] = item['abstract']
+                        
+                        if 'DOI' in item:
+                            citation['doi'] = item['DOI']
+                        
+                        # Calculate relevance score
+                        score = 0.3
+                        if citation.get('title'): score += 0.2
+                        if citation.get('abstract'): score += 0.3
+                        if citation.get('authors'): score += 0.1
+                        if citation.get('year'): score += 0.1
+                        citation['relevance_score'] = min(score, 1.0)
+                        
+                        if citation.get('title'):
+                            citations.append(citation)
+            except json.JSONDecodeError:
+                # If JSON parsing fails, try as generic XML
+                citations = parse_xml_file(content)
+                
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error parsing Zotero format: {str(e)}")
+    
+    return citations
+
 # --- 5. Dynamic LLM Provider Factory ---
 
 class LLMProviderFactory:
@@ -4020,6 +4280,15 @@ async def upload_files(files: List[UploadFile] = File(...), db: Session = Depend
                 citations_data = parse_ris_file(content)
             elif file.filename and file.filename.endswith('.xml'):
                 citations_data = parse_xml_file(content)
+            elif file.filename and file.filename.endswith('.enw'):
+                citations_data = parse_endnote_file(content)
+            elif file.filename and file.filename.endswith('.bib'):
+                citations_data = parse_mendeley_file(content)
+            elif file.filename and file.filename.endswith('.rdf'):
+                citations_data = parse_zotero_file(content)
+            elif file.filename and file.filename.endswith('.json'):
+                # Try Zotero CSL JSON format
+                citations_data = parse_zotero_file(content)
             else:
                 continue
             
