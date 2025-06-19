@@ -1611,6 +1611,203 @@ HTML_CONTENT = """
             background-color: #007bff;
         }
 
+        /* Advanced Search Interface */
+        .search-panel {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .search-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .search-toggle {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s ease;
+        }
+
+        .search-toggle:hover {
+            background-color: #5a6268;
+        }
+
+        .search-toggle.active {
+            background-color: #007bff;
+        }
+
+        .search-form {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .search-form.active {
+            display: grid;
+        }
+
+        .search-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .search-group label {
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+
+        .search-input {
+            padding: 0.5rem;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-input:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        .search-controls {
+            grid-column: span 2;
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            margin-top: 0.5rem;
+        }
+
+        .search-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s ease;
+        }
+
+        .search-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .search-btn.clear {
+            background-color: #6c757d;
+        }
+
+        .search-btn.clear:hover {
+            background-color: #5a6268;
+        }
+
+        .search-results-info {
+            background-color: #e7f3ff;
+            border: 1px solid #b8daff;
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: #0c5460;
+        }
+
+        .search-results-info.no-results {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+
+        .search-highlight {
+            background-color: #fff3cd;
+            padding: 0.1rem 0.2rem;
+            border-radius: 2px;
+            font-weight: 500;
+        }
+
+        .filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-chip {
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .filter-chip.active {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .filter-chip .remove {
+            background: none;
+            border: none;
+            color: inherit;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 0;
+            margin-left: 0.25rem;
+        }
+
+        .sorting-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .sort-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sort-select {
+            padding: 0.4rem;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .sort-direction {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .sort-direction:hover {
+            background-color: #5a6268;
+        }
+
+        .sort-direction.desc {
+            background-color: #007bff;
+        }
+
         /* Mobile Responsive */
         @media (max-width: 768px) {
             .ai-evaluation {
@@ -1634,6 +1831,20 @@ HTML_CONTENT = """
             
             .pico-scores {
                 grid-template-columns: 1fr;
+            }
+
+            .search-form {
+                grid-template-columns: 1fr;
+            }
+
+            .search-controls {
+                grid-column: span 1;
+            }
+
+            .sorting-controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.5rem;
             }
         }
 
@@ -2096,6 +2307,75 @@ HTML_CONTENT = """
                 </div>
             </div>
 
+            <!-- Advanced Search Panel -->
+            <div class="search-panel" id="searchPanel" style="display: none;">
+                <div class="search-header">
+                    <h4 style="color: #2c3e50; margin: 0;">Advanced Search & Filtering</h4>
+                    <button class="search-toggle" id="searchToggle" onclick="toggleSearch()">🔍 Advanced Search</button>
+                </div>
+                
+                <div class="search-form" id="searchForm">
+                    <div class="search-group">
+                        <label for="searchTitle">Title:</label>
+                        <input type="text" id="searchTitle" class="search-input" placeholder="Search by title...">
+                    </div>
+                    
+                    <div class="search-group">
+                        <label for="searchAuthors">Authors:</label>
+                        <input type="text" id="searchAuthors" class="search-input" placeholder="Search by authors...">
+                    </div>
+                    
+                    <div class="search-group">
+                        <label for="searchJournal">Journal:</label>
+                        <input type="text" id="searchJournal" class="search-input" placeholder="Search by journal...">
+                    </div>
+                    
+                    <div class="search-group">
+                        <label for="searchYear">Publication Year:</label>
+                        <input type="text" id="searchYear" class="search-input" placeholder="e.g. 2020-2024 or 2023">
+                    </div>
+                    
+                    <div class="search-group">
+                        <label for="searchKeywords">Keywords:</label>
+                        <input type="text" id="searchKeywords" class="search-input" placeholder="Search by keywords...">
+                    </div>
+                    
+                    <div class="search-group">
+                        <label for="searchAbstract">Abstract Content:</label>
+                        <input type="text" id="searchAbstract" class="search-input" placeholder="Search within abstracts...">
+                    </div>
+                    
+                    <div class="search-controls">
+                        <button class="search-btn clear" onclick="clearSearch()">Clear All</button>
+                        <button class="search-btn" onclick="performSearch()">Search</button>
+                    </div>
+                </div>
+
+                <!-- Active Filter Chips -->
+                <div class="filter-chips" id="filterChips" style="display: none;"></div>
+
+                <!-- Search Results Info -->
+                <div class="search-results-info" id="searchResultsInfo" style="display: none;"></div>
+
+                <!-- Sorting Controls -->
+                <div class="sorting-controls" id="sortingControls" style="display: none;">
+                    <div class="sort-group">
+                        <label for="sortBy">Sort by:</label>
+                        <select id="sortBy" class="sort-select" onchange="applySorting()">
+                            <option value="relevance">Relevance</option>
+                            <option value="title">Title</option>
+                            <option value="authors">Authors</option>
+                            <option value="year">Year</option>
+                            <option value="journal">Journal</option>
+                            <option value="decision">AI Decision</option>
+                            <option value="confidence">Confidence Score</option>
+                        </select>
+                    </div>
+                    
+                    <button class="sort-direction" id="sortDirection" onclick="toggleSortDirection()">▲ Ascending</button>
+                </div>
+            </div>
+
             <!-- Enhanced Metrics Panel -->
             <div class="metrics-panel" id="metricsPanel" style="display: none;">
                 <h4 style="margin-bottom: 1rem; color: #2c3e50;">Detailed Screening Metrics</h4>
@@ -2217,6 +2497,14 @@ HTML_CONTENT = """
         let currentAbstractIndex = 0;
         let filteredReferences = [];
         let currentFilter = 'all';
+        
+        // Search and Filtering Variables
+        let searchCriteria = {};
+        let activeFilters = [];
+        let sortBy = 'relevance';
+        let sortDirection = 'asc';
+        let searchResults = [];
+        let originalReferences = [];
 
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -2532,10 +2820,16 @@ HTML_CONTENT = """
             
             if (!references.length) {
                 listElement.innerHTML = '<div class="no-references">Configure LLM connections and upload files to begin screening</div>';
-                // Show abstract navigator if we have references with screening results
+                // Show search panel and navigator when we have references
+                updateSearchInterface();
                 updateAbstractNavigator();
                 updateMetricsPanel();
                 return;
+            }
+            
+            // Store original references for search
+            if (originalReferences.length === 0) {
+                originalReferences = [...references];
             }
 
             const referencesHtml = references.map(ref => {
@@ -2568,7 +2862,8 @@ HTML_CONTENT = """
 
             listElement.innerHTML = referencesHtml;
             
-            // Update abstract navigator and metrics when references change
+            // Update search interface, abstract navigator and metrics when references change
+            updateSearchInterface();
             updateAbstractNavigator();
             updateMetricsPanel();
         }
@@ -2946,6 +3241,394 @@ HTML_CONTENT = """
             
             document.getElementById('conflictPercentage').textContent = `${conflictPercentage}%`;
             document.getElementById('conflictProgressBar').style.width = `${conflictPercentage}%`;
+        }
+
+        // --- Advanced Search and Filtering Functions ---
+        function updateSearchInterface() {
+            const searchPanel = document.getElementById('searchPanel');
+            const sortingControls = document.getElementById('sortingControls');
+            
+            if (references.length > 0) {
+                searchPanel.style.display = 'block';
+                sortingControls.style.display = 'flex';
+            } else {
+                searchPanel.style.display = 'none';
+                sortingControls.style.display = 'none';
+            }
+        }
+
+        function toggleSearch() {
+            const searchForm = document.getElementById('searchForm');
+            const searchToggle = document.getElementById('searchToggle');
+            
+            if (searchForm.classList.contains('active')) {
+                searchForm.classList.remove('active');
+                searchToggle.classList.remove('active');
+                searchToggle.textContent = '🔍 Advanced Search';
+            } else {
+                searchForm.classList.add('active');
+                searchToggle.classList.add('active');
+                searchToggle.textContent = '✕ Hide Search';
+            }
+        }
+
+        function performSearch() {
+            const criteria = collectSearchCriteria();
+            
+            // Clear previous search if no criteria
+            if (Object.keys(criteria).length === 0) {
+                clearSearch();
+                return;
+            }
+            
+            searchCriteria = criteria;
+            searchResults = filterReferences(originalReferences, criteria);
+            
+            // Update references with search results
+            references = [...searchResults];
+            
+            // Apply sorting
+            applySorting();
+            
+            // Update UI components
+            updateFilterChips();
+            updateSearchResultsInfo();
+            updateReferenceList();
+            updateAbstractNavigator();
+            updateMetricsPanel();
+        }
+
+        function collectSearchCriteria() {
+            const criteria = {};
+            
+            const title = document.getElementById('searchTitle').value.trim();
+            const authors = document.getElementById('searchAuthors').value.trim();
+            const journal = document.getElementById('searchJournal').value.trim();
+            const year = document.getElementById('searchYear').value.trim();
+            const keywords = document.getElementById('searchKeywords').value.trim();
+            const abstract = document.getElementById('searchAbstract').value.trim();
+            
+            if (title) criteria.title = title;
+            if (authors) criteria.authors = authors;
+            if (journal) criteria.journal = journal;
+            if (year) criteria.year = year;
+            if (keywords) criteria.keywords = keywords;
+            if (abstract) criteria.abstract = abstract;
+            
+            return criteria;
+        }
+
+        function filterReferences(refs, criteria) {
+            return refs.filter(ref => {
+                // Title search
+                if (criteria.title && !searchInText(ref.title, criteria.title)) {
+                    return false;
+                }
+                
+                // Authors search
+                if (criteria.authors && !searchInText(ref.authors, criteria.authors)) {
+                    return false;
+                }
+                
+                // Journal search
+                if (criteria.journal && !searchInText(ref.journal, criteria.journal)) {
+                    return false;
+                }
+                
+                // Year search (supports ranges like "2020-2024" or single year "2023")
+                if (criteria.year && !matchYear(ref.year, criteria.year)) {
+                    return false;
+                }
+                
+                // Keywords search
+                if (criteria.keywords && !searchInText(ref.keywords, criteria.keywords)) {
+                    return false;
+                }
+                
+                // Abstract content search
+                if (criteria.abstract && !searchInText(ref.abstract, criteria.abstract)) {
+                    return false;
+                }
+                
+                return true;
+            });
+        }
+
+        function searchInText(text, searchTerm) {
+            if (!text || !searchTerm) return false;
+            return text.toLowerCase().includes(searchTerm.toLowerCase());
+        }
+
+        function matchYear(refYear, searchYear) {
+            if (!refYear || !searchYear) return false;
+            
+            const yearStr = refYear.toString();
+            
+            // Check for range (e.g., "2020-2024")
+            if (searchYear.includes('-')) {
+                const [startYear, endYear] = searchYear.split('-').map(y => parseInt(y.trim()));
+                const year = parseInt(yearStr);
+                return year >= startYear && year <= endYear;
+            }
+            
+            // Single year or partial match
+            return yearStr.includes(searchYear.trim());
+        }
+
+        function highlightSearchTerms(text, searchTerm) {
+            if (!text || !searchTerm) return text;
+            
+            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.replace(regex, '<span class="search-highlight">$1</span>');
+        }
+
+        function updateFilterChips() {
+            const chipsContainer = document.getElementById('filterChips');
+            
+            if (Object.keys(searchCriteria).length === 0) {
+                chipsContainer.style.display = 'none';
+                return;
+            }
+            
+            chipsContainer.style.display = 'flex';
+            
+            const chips = Object.entries(searchCriteria).map(([key, value]) => {
+                const displayName = {
+                    title: 'Title',
+                    authors: 'Authors',
+                    journal: 'Journal',
+                    year: 'Year',
+                    keywords: 'Keywords',
+                    abstract: 'Abstract'
+                }[key] || key;
+                
+                return `
+                    <div class="filter-chip active">
+                        ${displayName}: ${value}
+                        <button class="remove" onclick="removeFilter('${key}')">&times;</button>
+                    </div>
+                `;
+            }).join('');
+            
+            chipsContainer.innerHTML = chips;
+        }
+
+        function removeFilter(filterKey) {
+            delete searchCriteria[filterKey];
+            document.getElementById(`search${filterKey.charAt(0).toUpperCase() + filterKey.slice(1)}`).value = '';
+            
+            if (Object.keys(searchCriteria).length === 0) {
+                clearSearch();
+            } else {
+                performSearch();
+            }
+        }
+
+        function updateSearchResultsInfo() {
+            const infoElement = document.getElementById('searchResultsInfo');
+            
+            if (Object.keys(searchCriteria).length === 0) {
+                infoElement.style.display = 'none';
+                return;
+            }
+            
+            infoElement.style.display = 'block';
+            
+            const totalRefs = originalReferences.length;
+            const foundRefs = searchResults.length;
+            
+            if (foundRefs === 0) {
+                infoElement.className = 'search-results-info no-results';
+                infoElement.innerHTML = `
+                    No abstracts found matching your search criteria. 
+                    Try adjusting your search terms or clearing some filters.
+                `;
+            } else {
+                infoElement.className = 'search-results-info';
+                infoElement.innerHTML = `
+                    Found ${foundRefs} of ${totalRefs} abstracts matching your search criteria.
+                    ${foundRefs < totalRefs ? 'Use filters or modify your search to refine results.' : ''}
+                `;
+            }
+        }
+
+        function clearSearch() {
+            // Clear search form
+            document.getElementById('searchTitle').value = '';
+            document.getElementById('searchAuthors').value = '';
+            document.getElementById('searchJournal').value = '';
+            document.getElementById('searchYear').value = '';
+            document.getElementById('searchKeywords').value = '';
+            document.getElementById('searchAbstract').value = '';
+            
+            // Reset variables
+            searchCriteria = {};
+            searchResults = [];
+            references = [...originalReferences];
+            
+            // Update UI
+            updateFilterChips();
+            updateSearchResultsInfo();
+            updateReferenceList();
+            updateAbstractNavigator();
+            updateMetricsPanel();
+        }
+
+        function applySorting() {
+            const sortField = document.getElementById('sortBy').value;
+            const isDescending = document.getElementById('sortDirection').classList.contains('desc');
+            
+            references.sort((a, b) => {
+                let valueA, valueB;
+                
+                switch (sortField) {
+                    case 'title':
+                        valueA = (a.title || '').toLowerCase();
+                        valueB = (b.title || '').toLowerCase();
+                        break;
+                    case 'authors':
+                        valueA = (a.authors || '').toLowerCase();
+                        valueB = (b.authors || '').toLowerCase();
+                        break;
+                    case 'year':
+                        valueA = parseInt(a.year) || 0;
+                        valueB = parseInt(b.year) || 0;
+                        break;
+                    case 'journal':
+                        valueA = (a.journal || '').toLowerCase();
+                        valueB = (b.journal || '').toLowerCase();
+                        break;
+                    case 'decision':
+                        valueA = a.final_decision || 'pending';
+                        valueB = b.final_decision || 'pending';
+                        break;
+                    case 'confidence':
+                        valueA = getConfidenceScore(a) || 0;
+                        valueB = getConfidenceScore(b) || 0;
+                        break;
+                    case 'relevance':
+                    default:
+                        valueA = a.relevance_score || 0;
+                        valueB = b.relevance_score || 0;
+                        break;
+                }
+                
+                if (typeof valueA === 'string') {
+                    const comparison = valueA.localeCompare(valueB);
+                    return isDescending ? -comparison : comparison;
+                } else {
+                    const comparison = valueA - valueB;
+                    return isDescending ? -comparison : comparison;
+                }
+            });
+            
+            // Update the reference list and navigator
+            updateReferenceList();
+            updateAbstractNavigator();
+        }
+
+        function toggleSortDirection() {
+            const sortButton = document.getElementById('sortDirection');
+            
+            if (sortButton.classList.contains('desc')) {
+                sortButton.classList.remove('desc');
+                sortButton.textContent = '▲ Ascending';
+            } else {
+                sortButton.classList.add('desc');
+                sortButton.textContent = '▼ Descending';
+            }
+            
+            applySorting();
+        }
+
+        // Add search functionality to existing filter functions
+        function applyFilter() {
+            let baseReferences = searchResults.length > 0 ? searchResults : originalReferences;
+            
+            switch (currentFilter) {
+                case 'include':
+                    filteredReferences = baseReferences.filter(ref => ref.final_decision === 'include');
+                    break;
+                case 'exclude':
+                    filteredReferences = baseReferences.filter(ref => ref.final_decision === 'exclude');
+                    break;
+                case 'conflict':
+                    filteredReferences = baseReferences.filter(ref => ref.final_decision === 'conflict');
+                    break;
+                case 'pending':
+                    filteredReferences = baseReferences.filter(ref => !ref.final_decision || ref.status !== 'completed');
+                    break;
+                default:
+                    filteredReferences = [...baseReferences];
+            }
+            
+            // Reset index if it's out of bounds
+            if (currentAbstractIndex >= filteredReferences.length) {
+                currentAbstractIndex = 0;
+            }
+        }
+
+        // Enhanced renderAbstractCard to include search highlighting
+        function renderAbstractCardWithHighlighting(ref) {
+            const statusClass = getStatusClass(ref);
+            const confidenceScore = getConfidenceScore(ref);
+            
+            // Apply search highlighting if there are active search criteria
+            let title = ref.title || 'Untitled';
+            let authors = ref.authors || 'Unknown authors';
+            let journal = ref.journal || 'Unknown journal';
+            let abstract = ref.abstract || 'No abstract available';
+            
+            if (Object.keys(searchCriteria).length > 0) {
+                if (searchCriteria.title) title = highlightSearchTerms(title, searchCriteria.title);
+                if (searchCriteria.authors) authors = highlightSearchTerms(authors, searchCriteria.authors);
+                if (searchCriteria.journal) journal = highlightSearchTerms(journal, searchCriteria.journal);
+                if (searchCriteria.abstract) abstract = highlightSearchTerms(abstract, searchCriteria.abstract);
+            }
+            
+            return `
+                <div class="abstract-card">
+                    <div class="abstract-header">
+                        <div class="abstract-title">${title}</div>
+                        <div class="abstract-meta">
+                            <strong>Authors:</strong> ${authors}<br>
+                            <strong>Journal:</strong> ${journal} ${ref.year ? `(${ref.year})` : ''}<br>
+                            ${ref.doi ? `<strong>DOI:</strong> ${ref.doi}<br>` : ''}
+                            ${ref.keywords ? `<strong>Keywords:</strong> ${ref.keywords}<br>` : ''}
+                        </div>
+                        <div class="abstract-status">
+                            <div class="status-badge ${statusClass}">${getStatusText(ref)}</div>
+                            ${confidenceScore ? `<div class="confidence-score">${confidenceScore}% confidence</div>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="abstract-content">
+                        <div class="abstract-text">
+                            ${abstract}
+                        </div>
+                        
+                        ${renderAIEvaluation(ref)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update the displayCurrentAbstract function to use highlighting
+        function displayCurrentAbstract() {
+            const viewer = document.getElementById('abstractViewer');
+            
+            if (filteredReferences.length === 0) {
+                viewer.innerHTML = `
+                    <div class="no-evaluation">
+                        <p>No abstracts match the current filter: "${currentFilter}"</p>
+                        <p>Try selecting a different filter or complete more screening.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const ref = filteredReferences[currentAbstractIndex];
+            viewer.innerHTML = renderAbstractCardWithHighlighting(ref);
         }
 
         // Initialize
