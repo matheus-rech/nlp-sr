@@ -105,6 +105,23 @@ uvicorn main:app --host 0.0.0.0 --port 5000
 
 ## Recent Changes
 
+### June 19, 2025 - Additional Citation Format Support
+- **Enhanced Citation Format Support**: Added comprehensive support for major reference management systems
+  - EndNote format support (.enw tagged format and XML)
+  - Mendeley format support (.bib BibTeX format) with proper author and keyword parsing
+  - Zotero format support (.rdf RDF format and .json CSL JSON format)
+  - Enhanced XML parser with namespace support for multiple citation standards
+  - Automatic format detection and appropriate parser selection based on file extension
+- **Robust Citation Parsing**: Advanced field extraction across all supported formats
+  - Standardized author name handling and formatting across different citation styles
+  - Enhanced keyword extraction and DOI validation for all formats
+  - Improved year extraction with multiple date field support and validation
+  - Consistent relevance scoring algorithm applied across all citation formats
+- **User Interface Updates**: Frontend updated to reflect expanded format compatibility
+  - Upload area now shows all supported formats with clear file extension guidance
+  - File input accepts .ris, .xml, .enw, .bib, .rdf, .json formats
+  - Enhanced error handling with format-specific error messages for better user guidance
+
 ### June 19, 2025 - Citation Carousel Display Implementation
 - **Immediate Citation Display**: Enhanced file upload with citation carousel showing uploaded citations instantly
   - Citations display immediately after file upload without requiring page refresh

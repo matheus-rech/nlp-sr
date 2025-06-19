@@ -2763,8 +2763,9 @@ HTML_CONTENT = """
 
         <div class="controls">
             <div class="upload-area" id="uploadArea">
-                <div>Drop XML/RIS file here or click to browse</div>
-                <input type="file" id="fileInput" accept=".xml,.ris" multiple />
+                <div>Drop citation files here or click to browse</div>
+                <small>Supports: RIS, XML, EndNote (.enw), Mendeley (.bib), Zotero (.rdf, .json)</small>
+                <input type="file" id="fileInput" accept=".xml,.ris,.enw,.bib,.rdf,.json" multiple />
             </div>
             <button onclick="startScreening()" id="startBtn" class="ai-button" disabled>Start Screening</button>
             <button onclick="pauseScreening()" id="pauseBtn" disabled>Pause</button>
