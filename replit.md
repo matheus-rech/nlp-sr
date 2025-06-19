@@ -105,6 +105,27 @@ uvicorn main:app --host 0.0.0.0 --port 5000
 
 ## Recent Changes
 
+### June 19, 2025 - Complete Citation Display & Metrics Integration
+- **Fixed JavaScript Syntax Errors**: Resolved function call issues preventing application loading
+  - Fixed missing `prompt_variables` argument in LLM test connection function
+  - Corrected duplicate function definitions causing browser console errors
+  - Added proper status message and activity logging systems for user feedback
+- **Enhanced Citation Carousel Display**: Complete implementation of immediate citation visualization
+  - Citations appear instantly after file upload in responsive grid layout
+  - Each citation card shows title, authors, journal, year, relevance score, and status
+  - Hover effects and visual indicators for better user interaction
+  - Search and filter functionality with real-time results updating
+- **Comprehensive Metrics Panel**: Full performance tracking and analytics system
+  - Processing statistics: total citations, processed count, inclusion/exclusion rates
+  - AI performance metrics: response times, confidence scores, success rates
+  - Export controls with multiple format options (JSON, CSV, Excel)
+  - Real-time updates during screening processes
+- **Complete Search & Filter System**: Advanced citation management capabilities
+  - Search across title, authors, journal, abstract, keywords, and publication year
+  - Sort by relevance score, title, year, authors, or journal
+  - Clear search functionality with instant results display
+  - Filter chips showing active search criteria
+
 ### June 19, 2025 - Enhanced Screening Decision Structure
 - **Improved Screening Output Schema**: Enhanced the ScreeningDecision model with better structured outputs
   - Added evidence_quotes field for specific citation quotes supporting decisions

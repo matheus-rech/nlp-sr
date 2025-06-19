@@ -4914,11 +4914,18 @@ async def test_llm_connection(request: dict):
     config = request.get('config', {})
     
     try:
-        # Simple test prompt
-        test_prompt = "Respond with a valid JSON object containing 'status': 'success'"
-        result = await call_llm_api(config, test_prompt)
+        # Create a simple test using the LLM provider factory directly
+        llm_config = LLMConfig(**config)
+        llm = LLMProviderFactory.create_llm(llm_config)
         
-        return {"success": True, "result": result}
+        # Simple test message
+        test_message = "Respond with exactly: {'status': 'success', 'message': 'Connection working'}"
+        
+        # Test the connection
+        response = await llm.ainvoke(test_message)
+        response_text = response.content if hasattr(response, 'content') else str(response)
+        
+        return {"success": True, "response": response_text}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
