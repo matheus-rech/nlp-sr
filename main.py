@@ -1290,16 +1290,20 @@ async def get_frontend():
 
         .citations-controls {
             display: flex;
+            flex-direction: column;
             gap: 1rem;
             margin-bottom: 1rem;
-            align-items: center;
-            flex-wrap: wrap;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
         }
 
         .search-box {
             display: flex;
             gap: 0.5rem;
             align-items: center;
+            flex-wrap: wrap;
         }
 
         .search-box input {
@@ -1307,6 +1311,125 @@ async def get_frontend():
             border: 1px solid #ddd;
             border-radius: 4px;
             width: 300px;
+            font-size: 0.9rem;
+        }
+
+        .search-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filter-label {
+            font-size: 0.85rem;
+            color: #666;
+            font-weight: 500;
+            min-width: 60px;
+        }
+
+        .filter-select, .filter-input {
+            padding: 0.375rem 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            background: white;
+        }
+
+        .filter-input {
+            width: 100px;
+        }
+
+        .search-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+
+        .active-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            background: #007bff;
+            color: white;
+            border-radius: 15px;
+            font-size: 0.8rem;
+        }
+
+        .filter-chip-remove {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 0.25rem;
+            padding: 0 0.25rem;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            line-height: 1;
+        }
+
+        .filter-chip-remove:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .sort-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sort-button {
+            padding: 0.375rem 0.75rem;
+            background: #e9ecef;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .sort-button.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .sort-button:hover {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .clear-all-button {
+            padding: 0.375rem 0.75rem;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .clear-all-button:hover {
+            background: #545b62;
         }
 
         .sort-controls {
@@ -2074,19 +2197,61 @@ async def get_frontend():
                 <h3>Uploaded Citations</h3>
                 <div class="citations-controls">
                     <div class="search-box">
-                        <input type="text" id="citationSearch" placeholder="Search citations..." onkeyup="filterCitations()">
-                        <button onclick="clearSearch()">Clear</button>
+                        <input type="text" id="citationSearch" placeholder="Search citations by title, authors, abstract, keywords..." onkeyup="filterCitations()">
+                        <button class="clear-all-button" onclick="clearAllFilters()">Clear All</button>
                     </div>
+                    
+                    <div class="search-filters">
+                        <div class="filter-group">
+                            <span class="filter-label">Year:</span>
+                            <input type="number" id="yearFrom" class="filter-input" placeholder="From" min="1900" max="2030" onchange="filterCitations()">
+                            <span>-</span>
+                            <input type="number" id="yearTo" class="filter-input" placeholder="To" min="1900" max="2030" onchange="filterCitations()">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <span class="filter-label">Journal:</span>
+                            <input type="text" id="journalFilter" class="filter-input" placeholder="Journal name" onkeyup="filterCitations()">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <span class="filter-label">Authors:</span>
+                            <input type="text" id="authorsFilter" class="filter-input" placeholder="Author name" onkeyup="filterCitations()">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <span class="filter-label">Min Score:</span>
+                            <input type="number" id="minScore" class="filter-input" placeholder="0-100" min="0" max="100" step="10" onchange="filterCitations()">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <span class="filter-label">Status:</span>
+                            <select id="statusFilter" class="filter-select" onchange="filterCitations()">
+                                <option value="">All</option>
+                                <option value="ready">Ready</option>
+                                <option value="screened">Screened</option>
+                                <option value="included">Included</option>
+                                <option value="excluded">Excluded</option>
+                            </select>
+                        </div>
+                    </div>
+                    
                     <div class="sort-controls">
-                        <label>Sort by:</label>
-                        <select id="sortCitations" onchange="sortCitations()">
-                            <option value="relevance">Relevance Score</option>
-                            <option value="title">Title</option>
-                            <option value="year">Year</option>
-                            <option value="authors">Authors</option>
-                            <option value="journal">Journal</option>
-                        </select>
+                        <span class="filter-label">Sort by:</span>
+                        <button class="sort-button active" data-sort="relevance" onclick="setSortCriteria('relevance')">Relevance</button>
+                        <button class="sort-button" data-sort="title" onclick="setSortCriteria('title')">Title</button>
+                        <button class="sort-button" data-sort="year" onclick="setSortCriteria('year')">Year</button>
+                        <button class="sort-button" data-sort="authors" onclick="setSortCriteria('authors')">Authors</button>
+                        <button class="sort-button" data-sort="journal" onclick="setSortCriteria('journal')">Journal</button>
+                        <button class="sort-button" id="sortDirection" onclick="toggleSortDirection()">↓</button>
                     </div>
+                    
+                    <div class="active-filters" id="activeFilters"></div>
+                </div>
+                
+                <div class="search-stats" id="searchStats" style="display: none;">
+                    <span id="searchResultsInfo">Showing all citations</span>
+                    <span id="totalCitationsInfo">Total: 0</span>
                 </div>
                 <div id="citationsCarousel" class="citations-carousel">
                     <!-- Citations will be dynamically loaded here -->
@@ -2499,40 +2664,256 @@ async def get_frontend():
 
         function filterCitations() {
             const searchTerm = document.getElementById('citationSearch').value.toLowerCase();
+            const yearFrom = parseInt(document.getElementById('yearFrom').value) || null;
+            const yearTo = parseInt(document.getElementById('yearTo').value) || null;
+            const journalFilter = document.getElementById('journalFilter').value.toLowerCase();
+            const authorsFilter = document.getElementById('authorsFilter').value.toLowerCase();
+            const minScore = parseInt(document.getElementById('minScore').value) || null;
+            const statusFilter = document.getElementById('statusFilter').value;
             
-            if (!searchTerm.trim()) {
-                filteredCitations = [...uploadedCitations];
+            // Start with all citations
+            filteredCitations = uploadedCitations.filter(citation => {
+                // Text search across multiple fields
+                const textMatch = !searchTerm.trim() || 
+                    (citation.title && citation.title.toLowerCase().includes(searchTerm)) ||
+                    (citation.authors && citation.authors.toLowerCase().includes(searchTerm)) ||
+                    (citation.journal && citation.journal.toLowerCase().includes(searchTerm)) ||
+                    (citation.abstract && citation.abstract.toLowerCase().includes(searchTerm)) ||
+                    (citation.keywords && citation.keywords.toLowerCase().includes(searchTerm)) ||
+                    (citation.year && citation.year.toString().includes(searchTerm));
+
+                // Year range filter
+                const yearMatch = (!yearFrom || citation.year >= yearFrom) && 
+                                 (!yearTo || citation.year <= yearTo);
+
+                // Journal filter
+                const journalMatch = !journalFilter.trim() || 
+                    (citation.journal && citation.journal.toLowerCase().includes(journalFilter));
+
+                // Authors filter
+                const authorsMatch = !authorsFilter.trim() || 
+                    (citation.authors && citation.authors.toLowerCase().includes(authorsFilter));
+
+                // Minimum score filter
+                const scoreMatch = !minScore || 
+                    ((citation.relevance_score || 0.5) * 100) >= minScore;
+
+                // Status filter (placeholder - would be based on screening results)
+                const statusMatch = !statusFilter || statusFilter === 'ready';
+
+                return textMatch && yearMatch && journalMatch && authorsMatch && scoreMatch && statusMatch;
+            });
+            
+            // Apply current sorting
+            applySorting();
+            
+            // Update display and stats
+            displayCitations();
+            updateSearchStats();
+            updateActiveFilters();
+        }
+
+        function updateSearchStats() {
+            const searchStats = document.getElementById('searchStats');
+            const searchResultsInfo = document.getElementById('searchResultsInfo');
+            const totalCitationsInfo = document.getElementById('totalCitationsInfo');
+            
+            if (filteredCitations.length !== uploadedCitations.length || hasActiveFilters()) {
+                searchStats.style.display = 'flex';
+                searchResultsInfo.textContent = `Showing ${filteredCitations.length} of ${uploadedCitations.length} citations`;
+                totalCitationsInfo.textContent = `Total: ${uploadedCitations.length}`;
             } else {
-                filteredCitations = uploadedCitations.filter(citation => {
-                    return (citation.title && citation.title.toLowerCase().includes(searchTerm)) ||
-                           (citation.authors && citation.authors.toLowerCase().includes(searchTerm)) ||
-                           (citation.journal && citation.journal.toLowerCase().includes(searchTerm)) ||
-                           (citation.abstract && citation.abstract.toLowerCase().includes(searchTerm)) ||
-                           (citation.keywords && citation.keywords.toLowerCase().includes(searchTerm)) ||
-                           (citation.year && citation.year.toString().includes(searchTerm));
-                });
+                searchStats.style.display = 'none';
+            }
+        }
+
+        function hasActiveFilters() {
+            return document.getElementById('citationSearch').value.trim() ||
+                   document.getElementById('yearFrom').value ||
+                   document.getElementById('yearTo').value ||
+                   document.getElementById('journalFilter').value.trim() ||
+                   document.getElementById('authorsFilter').value.trim() ||
+                   document.getElementById('minScore').value ||
+                   document.getElementById('statusFilter').value;
+        }
+
+        function updateActiveFilters() {
+            const activeFiltersContainer = document.getElementById('activeFilters');
+            activeFiltersContainer.innerHTML = '';
+            
+            const filters = [];
+            
+            const searchTerm = document.getElementById('citationSearch').value.trim();
+            if (searchTerm) {
+                filters.push({ type: 'search', label: `Search: "${searchTerm}"`, clear: () => {
+                    document.getElementById('citationSearch').value = '';
+                }});
             }
             
+            const yearFrom = document.getElementById('yearFrom').value;
+            const yearTo = document.getElementById('yearTo').value;
+            if (yearFrom || yearTo) {
+                const yearLabel = yearFrom && yearTo ? `Year: ${yearFrom}-${yearTo}` :
+                                 yearFrom ? `Year: ${yearFrom}+` : `Year: -${yearTo}`;
+                filters.push({ type: 'year', label: yearLabel, clear: () => {
+                    document.getElementById('yearFrom').value = '';
+                    document.getElementById('yearTo').value = '';
+                }});
+            }
+            
+            const journalFilter = document.getElementById('journalFilter').value.trim();
+            if (journalFilter) {
+                filters.push({ type: 'journal', label: `Journal: "${journalFilter}"`, clear: () => {
+                    document.getElementById('journalFilter').value = '';
+                }});
+            }
+            
+            const authorsFilter = document.getElementById('authorsFilter').value.trim();
+            if (authorsFilter) {
+                filters.push({ type: 'authors', label: `Authors: "${authorsFilter}"`, clear: () => {
+                    document.getElementById('authorsFilter').value = '';
+                }});
+            }
+            
+            const minScore = document.getElementById('minScore').value;
+            if (minScore) {
+                filters.push({ type: 'score', label: `Min Score: ${minScore}%`, clear: () => {
+                    document.getElementById('minScore').value = '';
+                }});
+            }
+            
+            const statusFilter = document.getElementById('statusFilter').value;
+            if (statusFilter) {
+                filters.push({ type: 'status', label: `Status: ${statusFilter}`, clear: () => {
+                    document.getElementById('statusFilter').value = '';
+                }});
+            }
+            
+            filters.forEach(filter => {
+                const chip = document.createElement('div');
+                chip.className = 'filter-chip';
+                chip.innerHTML = `
+                    ${filter.label}
+                    <span class="filter-chip-remove" onclick="clearSpecificFilter('${filter.type}')">×</span>
+                `;
+                activeFiltersContainer.appendChild(chip);
+            });
+        }
+
+        function clearSpecificFilter(filterType) {
+            switch(filterType) {
+                case 'search':
+                    document.getElementById('citationSearch').value = '';
+                    break;
+                case 'year':
+                    document.getElementById('yearFrom').value = '';
+                    document.getElementById('yearTo').value = '';
+                    break;
+                case 'journal':
+                    document.getElementById('journalFilter').value = '';
+                    break;
+                case 'authors':
+                    document.getElementById('authorsFilter').value = '';
+                    break;
+                case 'score':
+                    document.getElementById('minScore').value = '';
+                    break;
+                case 'status':
+                    document.getElementById('statusFilter').value = '';
+                    break;
+            }
+            filterCitations();
+        }
+
+        function clearAllFilters() {
+            document.getElementById('citationSearch').value = '';
+            document.getElementById('yearFrom').value = '';
+            document.getElementById('yearTo').value = '';
+            document.getElementById('journalFilter').value = '';
+            document.getElementById('authorsFilter').value = '';
+            document.getElementById('minScore').value = '';
+            document.getElementById('statusFilter').value = '';
+            
+            filteredCitations = [...uploadedCitations];
+            applySorting();
+            displayCitations();
+            updateSearchStats();
+            updateActiveFilters();
+        }
+
+        function setSortCriteria(sortField) {
+            // Update active sort button
+            document.querySelectorAll('.sort-button[data-sort]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-sort="${sortField}"]`).classList.add('active');
+            
+            currentSortField = sortField;
+            applySorting();
             displayCitations();
         }
 
-        function clearSearch() {
-            document.getElementById('citationSearch').value = '';
-            filteredCitations = [...uploadedCitations];
+        function toggleSortDirection() {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            document.getElementById('sortDirection').textContent = currentSortDirection === 'asc' ? '↑' : '↓';
+            applySorting();
             displayCitations();
+        }
+
+        function applySorting() {
+            filteredCitations.sort((a, b) => {
+                let aValue, bValue;
+                
+                switch(currentSortField) {
+                    case 'relevance':
+                        aValue = a.relevance_score || 0.5;
+                        bValue = b.relevance_score || 0.5;
+                        break;
+                    case 'title':
+                        aValue = (a.title || '').toLowerCase();
+                        bValue = (b.title || '').toLowerCase();
+                        break;
+                    case 'year':
+                        aValue = a.year || 0;
+                        bValue = b.year || 0;
+                        break;
+                    case 'authors':
+                        aValue = (a.authors || '').toLowerCase();
+                        bValue = (b.authors || '').toLowerCase();
+                        break;
+                    case 'journal':
+                        aValue = (a.journal || '').toLowerCase();
+                        bValue = (b.journal || '').toLowerCase();
+                        break;
+                    default:
+                        return 0;
+                }
+                
+                if (typeof aValue === 'string') {
+                    const result = aValue.localeCompare(bValue);
+                    return currentSortDirection === 'asc' ? result : -result;
+                } else {
+                    const result = aValue - bValue;
+                    return currentSortDirection === 'asc' ? result : -result;
+                }
+            });
+        }
+
+        // Legacy function for backward compatibility
+        function clearSearch() {
+            clearAllFilters();
         }
 
         function sortCitations() {
-            const sortBy = document.getElementById('sortCitations').value;
-            
-            filteredCitations.sort((a, b) => {
-                switch(sortBy) {
-                    case 'relevance':
-                        return (b.relevance_score || 0.5) - (a.relevance_score || 0.5);
-                    case 'title':
-                        return (a.title || '').localeCompare(b.title || '');
-                    case 'year':
-                        return (b.year || 0) - (a.year || 0);
+            applySorting();
+            displayCitations();
+        }
+
+        // Initialize filteredCitations when citations are loaded
+        let uploadedCitations = [];
+        let filteredCitations = [];
+        let currentSortField = 'relevance';
+        let currentSortDirection = 'desc';
                     case 'authors':
                         return (a.authors || '').localeCompare(b.authors || '');
                     case 'journal':
