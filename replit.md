@@ -105,6 +105,19 @@ uvicorn main:app --host 0.0.0.0 --port 5000
 
 ## Recent Changes
 
+### June 19, 2025 - Citation Carousel Display Implementation
+- **Immediate Citation Display**: Enhanced file upload with citation carousel showing uploaded citations instantly
+  - Citations display immediately after file upload without requiring page refresh
+  - Horizontal scrollable carousel with properly formatted citation cards
+  - Each card shows title, authors, journal, year, truncated abstract, relevance score, and status
+  - Hover effects and smooth scrolling with navigation controls for large citation sets
+  - Database schema updated to support ai1_result and ai2_result columns for dual LLM workflow
+  - Upload response enhanced to include citation data for immediate frontend display
+- **User Experience Enhancement**: Eliminates waiting time between upload and citation visibility
+  - Users can immediately review their uploaded citations in a clean, organized format
+  - Cards show essential citation information at a glance with visual relevance scoring
+  - Ready status indicators show citations are prepared for screening workflow
+
 ### June 19, 2025 - Advanced Dual LLM Judgment System Integration
 - **Intelligent Conflict Resolution**: Sophisticated agreement scoring algorithm
   - Multi-factor analysis: decision agreement, confidence alignment, PICO scores, quality assessment

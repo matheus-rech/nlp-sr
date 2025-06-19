@@ -276,6 +276,8 @@ class CitationUploadResponse(BaseModel):
     project_id: str
     citations_count: int
     message: str
+    citations: Optional[List[Dict[str, Any]]] = None
+    status: str = "success"
 
 # --- 4. Advanced File Parsing ---
 
