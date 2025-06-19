@@ -1259,6 +1259,384 @@ HTML_CONTENT = """
             background-color: white;
         }
 
+        /* Abstract Navigator */
+        .abstract-navigator {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .navigator-header {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navigator-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .nav-button {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s ease;
+        }
+
+        .nav-button:hover {
+            background-color: #5a6268;
+        }
+
+        .nav-button:disabled {
+            background-color: #dee2e6;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .abstract-counter {
+            font-weight: bold;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 0.25rem;
+            margin-left: 1rem;
+        }
+
+        .filter-tab {
+            background-color: #e9ecef;
+            color: #495057;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+        }
+
+        .filter-tab.active {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .filter-tab:hover {
+            background-color: #0056b3;
+            color: white;
+        }
+
+        .abstract-viewer {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .abstract-card {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .abstract-header {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+            position: relative;
+        }
+
+        .abstract-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .abstract-meta {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .abstract-status {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-badge.include {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-badge.exclude {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-badge.conflict {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status-badge.pending {
+            background-color: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d1ecf1;
+        }
+
+        .confidence-score {
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 0.25rem 0.5rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .abstract-content {
+            padding: 1.5rem;
+        }
+
+        .abstract-text {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 6px;
+            line-height: 1.6;
+            color: #495057;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #007bff;
+        }
+
+        .ai-evaluation {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .ai-panel {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+        }
+
+        .ai-panel h4 {
+            color: #495057;
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ai-decision {
+            font-weight: bold;
+            padding: 0.5rem;
+            border-radius: 4px;
+            text-align: center;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .ai-decision.include {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .ai-decision.exclude {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .ai-reasoning {
+            font-size: 0.85rem;
+            color: #6c757d;
+            line-height: 1.4;
+            background-color: white;
+            padding: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+
+        .pico-scores {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .pico-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            background-color: white;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .pico-score {
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .study-info {
+            background-color: #e9ecef;
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-top: 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .study-info strong {
+            color: #495057;
+        }
+
+        .no-evaluation {
+            text-align: center;
+            color: #6c757d;
+            padding: 2rem;
+            font-style: italic;
+        }
+
+        /* Metrics Panel Enhancement */
+        .metrics-panel {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .metric-item {
+            text-align: center;
+            padding: 0.75rem;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .metric-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+
+        .progress-metrics {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .progress-bar-container {
+            margin: 0.5rem 0;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-bottom: 0.25rem;
+        }
+
+        .progress-bar-bg {
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .progress-bar-fill.include {
+            background-color: #28a745;
+        }
+
+        .progress-bar-fill.exclude {
+            background-color: #dc3545;
+        }
+
+        .progress-bar-fill.conflict {
+            background-color: #ffc107;
+        }
+
+        .progress-bar-fill.processed {
+            background-color: #007bff;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .ai-evaluation {
+                grid-template-columns: 1fr;
+            }
+            
+            .navigator-header {
+                flex-direction: column;
+                gap: 0.5rem;
+                align-items: stretch;
+            }
+            
+            .navigator-controls {
+                justify-content: space-between;
+            }
+            
+            .filter-tabs {
+                margin-left: 0;
+                justify-content: center;
+            }
+            
+            .pico-scores {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* Reference Display */
         .reference {
             border: 1px solid #ddd;
@@ -1717,6 +2095,105 @@ HTML_CONTENT = """
                     <div class="queue-item">No items in queue</div>
                 </div>
             </div>
+
+            <!-- Enhanced Metrics Panel -->
+            <div class="metrics-panel" id="metricsPanel" style="display: none;">
+                <h4 style="margin-bottom: 1rem; color: #2c3e50;">Detailed Screening Metrics</h4>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <div class="metric-value" id="totalAbstracts">0</div>
+                        <div class="metric-label">Total Abstracts</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="processedAbstracts">0</div>
+                        <div class="metric-label">Processed</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="includedAbstracts">0</div>
+                        <div class="metric-label">Included</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="excludedAbstracts">0</div>
+                        <div class="metric-label">Excluded</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="conflictAbstracts">0</div>
+                        <div class="metric-label">Conflicts</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="inclusionRate">0%</div>
+                        <div class="metric-label">Inclusion Rate</div>
+                    </div>
+                </div>
+                
+                <div class="progress-metrics">
+                    <div class="progress-bar-container">
+                        <div class="progress-label">
+                            <span>Processing Progress</span>
+                            <span id="processingPercentage">0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill processed" id="processingProgressBar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-bar-container">
+                        <div class="progress-label">
+                            <span>Inclusion Distribution</span>
+                            <span id="inclusionPercentage">0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill include" id="inclusionProgressBar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-bar-container">
+                        <div class="progress-label">
+                            <span>Exclusion Distribution</span>
+                            <span id="exclusionPercentage">0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill exclude" id="exclusionProgressBar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-bar-container">
+                        <div class="progress-label">
+                            <span>Conflicts</span>
+                            <span id="conflictPercentage">0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill conflict" id="conflictProgressBar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Abstract Navigator -->
+            <div class="abstract-navigator" id="abstractNavigator" style="display: none;">
+                <div class="navigator-header">
+                    <div class="navigator-controls">
+                        <button class="nav-button" id="prevButton" onclick="navigateAbstract(-1)">◀ Previous</button>
+                        <span class="abstract-counter" id="abstractCounter">0 / 0</span>
+                        <button class="nav-button" id="nextButton" onclick="navigateAbstract(1)">Next ▶</button>
+                    </div>
+                    
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" data-filter="all" onclick="setFilter('all')">All</button>
+                        <button class="filter-tab" data-filter="include" onclick="setFilter('include')">Included</button>
+                        <button class="filter-tab" data-filter="exclude" onclick="setFilter('exclude')">Excluded</button>
+                        <button class="filter-tab" data-filter="conflict" onclick="setFilter('conflict')">Conflicts</button>
+                        <button class="filter-tab" data-filter="pending" onclick="setFilter('pending')">Pending</button>
+                    </div>
+                </div>
+                
+                <div class="abstract-viewer" id="abstractViewer">
+                    <div class="no-evaluation">
+                        <p>No abstracts available for review.</p>
+                        <p>Upload citations and complete screening to see results here.</p>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="reference-list" id="referenceList">
@@ -1735,6 +2212,11 @@ HTML_CONTENT = """
             ai2: { connected: false }
         };
         let providerConfigs = {};
+        
+        // Abstract Navigator Variables
+        let currentAbstractIndex = 0;
+        let filteredReferences = [];
+        let currentFilter = 'all';
 
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -2050,6 +2532,9 @@ HTML_CONTENT = """
             
             if (!references.length) {
                 listElement.innerHTML = '<div class="no-references">Configure LLM connections and upload files to begin screening</div>';
+                // Show abstract navigator if we have references with screening results
+                updateAbstractNavigator();
+                updateMetricsPanel();
                 return;
             }
 
@@ -2082,6 +2567,10 @@ HTML_CONTENT = """
             }).join('');
 
             listElement.innerHTML = referencesHtml;
+            
+            // Update abstract navigator and metrics when references change
+            updateAbstractNavigator();
+            updateMetricsPanel();
         }
 
         function renderAnalysisResults(ref) {
@@ -2180,6 +2669,283 @@ HTML_CONTENT = """
             } catch (error) {
                 alert('Error exporting results: ' + error.message);
             }
+        }
+
+        // --- Abstract Navigator Functions ---
+        function updateAbstractNavigator() {
+            const navigator = document.getElementById('abstractNavigator');
+            const metricsPanel = document.getElementById('metricsPanel');
+            
+            // Show navigator if we have any references
+            if (references.length > 0) {
+                navigator.style.display = 'flex';
+                metricsPanel.style.display = 'block';
+                
+                // Apply current filter
+                applyFilter();
+                
+                // Update navigation controls
+                updateNavigationControls();
+                
+                // Display current abstract
+                displayCurrentAbstract();
+            } else {
+                navigator.style.display = 'none';
+                metricsPanel.style.display = 'none';
+            }
+        }
+
+        function applyFilter() {
+            switch (currentFilter) {
+                case 'include':
+                    filteredReferences = references.filter(ref => ref.final_decision === 'include');
+                    break;
+                case 'exclude':
+                    filteredReferences = references.filter(ref => ref.final_decision === 'exclude');
+                    break;
+                case 'conflict':
+                    filteredReferences = references.filter(ref => ref.final_decision === 'conflict');
+                    break;
+                case 'pending':
+                    filteredReferences = references.filter(ref => !ref.final_decision || ref.status !== 'completed');
+                    break;
+                default:
+                    filteredReferences = [...references];
+            }
+            
+            // Reset index if it's out of bounds
+            if (currentAbstractIndex >= filteredReferences.length) {
+                currentAbstractIndex = 0;
+            }
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            currentAbstractIndex = 0;
+            
+            // Update filter tab UI
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+            
+            // Apply filter and update display
+            applyFilter();
+            updateNavigationControls();
+            displayCurrentAbstract();
+        }
+
+        function navigateAbstract(direction) {
+            if (filteredReferences.length === 0) return;
+            
+            currentAbstractIndex += direction;
+            
+            // Handle wraparound
+            if (currentAbstractIndex < 0) {
+                currentAbstractIndex = filteredReferences.length - 1;
+            } else if (currentAbstractIndex >= filteredReferences.length) {
+                currentAbstractIndex = 0;
+            }
+            
+            updateNavigationControls();
+            displayCurrentAbstract();
+        }
+
+        function updateNavigationControls() {
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
+            const counter = document.getElementById('abstractCounter');
+            
+            const total = filteredReferences.length;
+            const current = total > 0 ? currentAbstractIndex + 1 : 0;
+            
+            counter.textContent = `${current} / ${total}`;
+            
+            // Enable/disable navigation buttons
+            prevButton.disabled = total === 0;
+            nextButton.disabled = total === 0;
+        }
+
+        function displayCurrentAbstract() {
+            const viewer = document.getElementById('abstractViewer');
+            
+            if (filteredReferences.length === 0) {
+                viewer.innerHTML = `
+                    <div class="no-evaluation">
+                        <p>No abstracts match the current filter: "${currentFilter}"</p>
+                        <p>Try selecting a different filter or complete more screening.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const ref = filteredReferences[currentAbstractIndex];
+            viewer.innerHTML = renderAbstractCard(ref);
+        }
+
+        function renderAbstractCard(ref) {
+            const statusClass = getStatusClass(ref);
+            const confidenceScore = getConfidenceScore(ref);
+            
+            return `
+                <div class="abstract-card">
+                    <div class="abstract-header">
+                        <div class="abstract-title">${ref.title || 'Untitled'}</div>
+                        <div class="abstract-meta">
+                            <strong>Authors:</strong> ${ref.authors || 'Unknown authors'}<br>
+                            <strong>Journal:</strong> ${ref.journal || 'Unknown journal'} ${ref.year ? `(${ref.year})` : ''}<br>
+                            ${ref.doi ? `<strong>DOI:</strong> ${ref.doi}<br>` : ''}
+                            ${ref.keywords ? `<strong>Keywords:</strong> ${ref.keywords}<br>` : ''}
+                        </div>
+                        <div class="abstract-status">
+                            <div class="status-badge ${statusClass}">${getStatusText(ref)}</div>
+                            ${confidenceScore ? `<div class="confidence-score">${confidenceScore}% confidence</div>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="abstract-content">
+                        <div class="abstract-text">
+                            ${ref.abstract || 'No abstract available'}
+                        </div>
+                        
+                        ${renderAIEvaluation(ref)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAIEvaluation(ref) {
+            if (!ref.ai1_result && !ref.ai2_result) {
+                return `
+                    <div class="no-evaluation">
+                        <p>No AI evaluation available yet.</p>
+                        <p>This abstract is pending screening.</p>
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="ai-evaluation">
+                    ${ref.ai1_result ? renderAIPanel('Conservative AI', ref.ai1_result) : ''}
+                    ${ref.ai2_result ? renderAIPanel('Pragmatic AI', ref.ai2_result) : ''}
+                </div>
+            `;
+        }
+
+        function renderAIPanel(title, aiResult) {
+            const decision = aiResult.decision || 'unknown';
+            const confidence = aiResult.confidence || 0;
+            const reasoning = aiResult.reasoning || 'No reasoning provided';
+            const picoScores = aiResult.pico_scores || {};
+            const studyDesign = aiResult.study_design || 'Unknown';
+            const qualityAssessment = aiResult.quality_assessment || 'Unknown';
+            const keyFindings = aiResult.key_findings || [];
+            
+            return `
+                <div class="ai-panel">
+                    <h4>${title} <span class="confidence-score">${confidence}%</span></h4>
+                    
+                    <div class="ai-decision ${decision}">
+                        ${decision.toUpperCase()}
+                    </div>
+                    
+                    <div class="ai-reasoning">
+                        ${reasoning}
+                    </div>
+                    
+                    <div class="pico-scores">
+                        <div class="pico-item">
+                            <span>Population:</span>
+                            <span class="pico-score">${(picoScores.population * 100 || 0).toFixed(0)}%</span>
+                        </div>
+                        <div class="pico-item">
+                            <span>Intervention:</span>
+                            <span class="pico-score">${(picoScores.intervention * 100 || 0).toFixed(0)}%</span>
+                        </div>
+                        <div class="pico-item">
+                            <span>Comparison:</span>
+                            <span class="pico-score">${(picoScores.comparison * 100 || 0).toFixed(0)}%</span>
+                        </div>
+                        <div class="pico-item">
+                            <span>Outcome:</span>
+                            <span class="pico-score">${(picoScores.outcome * 100 || 0).toFixed(0)}%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="study-info">
+                        <strong>Study Design:</strong> ${studyDesign}<br>
+                        <strong>Quality Assessment:</strong> ${qualityAssessment}
+                        ${keyFindings.length > 0 ? `<br><strong>Key Findings:</strong> ${keyFindings.join(', ')}` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function getStatusClass(ref) {
+            if (ref.status === 'processing') return 'pending';
+            if (ref.final_decision === 'conflict') return 'conflict';
+            if (ref.final_decision === 'include') return 'include';
+            if (ref.final_decision === 'exclude') return 'exclude';
+            return 'pending';
+        }
+
+        function getStatusText(ref) {
+            if (ref.status === 'processing') return 'Processing';
+            if (ref.final_decision === 'conflict') return 'Conflict';
+            if (ref.final_decision === 'include') return 'Include';
+            if (ref.final_decision === 'exclude') return 'Exclude';
+            return 'Pending';
+        }
+
+        function getConfidenceScore(ref) {
+            if (ref.ai1_result && ref.ai2_result) {
+                return Math.round((ref.ai1_result.confidence + ref.ai2_result.confidence) / 2);
+            } else if (ref.ai1_result) {
+                return ref.ai1_result.confidence;
+            } else if (ref.ai2_result) {
+                return ref.ai2_result.confidence;
+            }
+            return null;
+        }
+
+        function updateMetricsPanel() {
+            if (references.length === 0) {
+                document.getElementById('metricsPanel').style.display = 'none';
+                return;
+            }
+            
+            const total = references.length;
+            const processed = references.filter(r => r.status === 'completed').length;
+            const included = references.filter(r => r.final_decision === 'include').length;
+            const excluded = references.filter(r => r.final_decision === 'exclude').length;
+            const conflicts = references.filter(r => r.final_decision === 'conflict').length;
+            
+            const inclusionRate = processed > 0 ? Math.round((included / processed) * 100) : 0;
+            const processingPercentage = Math.round((processed / total) * 100);
+            const inclusionPercentage = total > 0 ? Math.round((included / total) * 100) : 0;
+            const exclusionPercentage = total > 0 ? Math.round((excluded / total) * 100) : 0;
+            const conflictPercentage = total > 0 ? Math.round((conflicts / total) * 100) : 0;
+            
+            // Update metric values
+            document.getElementById('totalAbstracts').textContent = total;
+            document.getElementById('processedAbstracts').textContent = processed;
+            document.getElementById('includedAbstracts').textContent = included;
+            document.getElementById('excludedAbstracts').textContent = excluded;
+            document.getElementById('conflictAbstracts').textContent = conflicts;
+            document.getElementById('inclusionRate').textContent = `${inclusionRate}%`;
+            
+            // Update progress bars
+            document.getElementById('processingPercentage').textContent = `${processingPercentage}%`;
+            document.getElementById('processingProgressBar').style.width = `${processingPercentage}%`;
+            
+            document.getElementById('inclusionPercentage').textContent = `${inclusionPercentage}%`;
+            document.getElementById('inclusionProgressBar').style.width = `${inclusionPercentage}%`;
+            
+            document.getElementById('exclusionPercentage').textContent = `${exclusionPercentage}%`;
+            document.getElementById('exclusionProgressBar').style.width = `${exclusionPercentage}%`;
+            
+            document.getElementById('conflictPercentage').textContent = `${conflictPercentage}%`;
+            document.getElementById('conflictProgressBar').style.width = `${conflictPercentage}%`;
         }
 
         // Initialize
