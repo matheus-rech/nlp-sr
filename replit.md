@@ -105,6 +105,25 @@ uvicorn main:app --host 0.0.0.0 --port 5000
 
 ## Recent Changes
 
+### June 19, 2025 - Complete Upload Area & Citation Modal Implementation
+- **Fixed JavaScript Mode Button Error**: Resolved the "null is not an object" error in setScreeningMode function
+  - Added proper null checking for mode button elements
+  - Function now safely handles missing DOM elements
+- **Complete Citation Carousel**: Fully functional upload area with immediate citation display
+  - Citations appear instantly after file upload in responsive carousel format
+  - Each citation card shows title, authors, journal, year, relevance score, and "View Details" button
+  - Search and filtering functionality works correctly across all citation fields
+- **Individual Citation Modal**: Complete LLM judgment display system
+  - Modal shows full citation details including abstract, keywords, and metadata
+  - Displays AI screening analysis when available (conservative vs pragmatic judgments)
+  - Shows decision badges, confidence scores, reasoning text, evidence quotes, and PICO scores
+  - Side-by-side comparison of dual LLM results with final decision display
+  - Added API endpoint for fetching individual citation screening results
+- **Enhanced User Experience**: Complete workflow from upload to individual citation analysis
+  - Users can upload files, see citations immediately, and view detailed AI analysis
+  - Modal closes properly with outside clicks and close button
+  - Professional styling with proper decision color coding and layout
+
 ### June 19, 2025 - Fixed Interface Layout & Accessibility Issues
 - **Resolved CSS Layout Problems**: Fixed interface structure so all elements are properly accessible
   - Made criteria configuration section scrollable with proper height constraints

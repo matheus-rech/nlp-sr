@@ -1606,6 +1606,21 @@ async def get_frontend():
             text-transform: uppercase;
         }
 
+        .view-details-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-left: 0.5rem;
+        }
+
+        .view-details-btn:hover {
+            background: #0056b3;
+        }
+
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -2856,6 +2871,154 @@ async def get_frontend():
                 alert('Error exporting results: ' + error.message);
             }
         }
+
+        // --- Citation Modal Functions ---
+        async function showCitationDetails(citationId) {
+            const citation = uploadedCitations.find(c => c.id === citationId);
+            if (!citation) {
+                showStatusMessage('Citation not found', 'error');
+                return;
+            }
+
+            const modalBody = document.getElementById('modalBody');
+            
+            // Build citation detail HTML
+            let html = `
+                <div class="citation-detail">
+                    <h4>📄 Citation Information</h4>
+                    <div class="citation-meta-detail">
+                        <p><strong>Title:</strong> ${citation.title || 'No title available'}</p>
+                        <p><strong>Authors:</strong> ${citation.authors || 'Unknown'}</p>
+                        <p><strong>Journal:</strong> ${citation.journal || 'Unknown'}</p>
+                        <p><strong>Year:</strong> ${citation.year || 'Unknown'}</p>
+                        ${citation.doi ? `<p><strong>DOI:</strong> ${citation.doi}</p>` : ''}
+                        ${citation.keywords ? `<p><strong>Keywords:</strong> ${citation.keywords}</p>` : ''}
+                        <p><strong>Relevance Score:</strong> ${((citation.relevance_score || 0.5) * 100).toFixed(0)}%</p>
+                    </div>
+                    ${citation.abstract ? `
+                        <h4>📝 Abstract</h4>
+                        <div class="citation-meta-detail">
+                            <p>${citation.abstract}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Check if this citation has been screened (has AI results)
+            if (currentProject) {
+                try {
+                    const response = await fetch(`/api/projects/${currentProject}/citations/${citationId}/results`);
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.ai1_result || result.ai2_result) {
+                            html += generateAIAnalysisHTML(result);
+                        } else {
+                            html += `
+                                <div class="ai-analysis">
+                                    <div class="no-analysis">
+                                        <p><em>This citation has not been screened yet. Start the screening process to see AI analysis.</em></p>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching screening results:', error);
+                }
+            }
+
+            modalBody.innerHTML = html;
+            document.getElementById('citationModal').style.display = 'flex';
+        }
+
+        function generateAIAnalysisHTML(result) {
+            let html = '<div class="ai-analysis"><h4>🤖 AI Screening Analysis</h4>';
+            
+            if (result.ai1_result) {
+                html += generateSingleAIResultHTML('AI Model 1 (Conservative)', result.ai1_result);
+            }
+            
+            if (result.ai2_result) {
+                html += generateSingleAIResultHTML('AI Model 2 (Pragmatic)', result.ai2_result);
+            }
+
+            if (result.final_decision) {
+                const decisionClass = result.final_decision === 'include' ? 'decision-include' : 
+                                    result.final_decision === 'exclude' ? 'decision-exclude' : 'decision-uncertain';
+                
+                html += `
+                    <div class="final-decision" style="grid-column: 1 / -1; margin-top: 1.5rem; padding: 1rem; border: 2px solid #007bff; border-radius: 6px; background: #f8f9fa;">
+                        <h5>🎯 Final Decision</h5>
+                        <div class="decision-badge ${decisionClass}">${result.final_decision}</div>
+                        ${result.confidence_score ? `<p><strong>Confidence:</strong> ${(result.confidence_score * 100).toFixed(1)}%</p>` : ''}
+                        ${result.notes ? `<div class="reasoning-text">${result.notes}</div>` : ''}
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function generateSingleAIResultHTML(title, aiResult) {
+            if (!aiResult || typeof aiResult !== 'object') return '';
+            
+            const decision = aiResult.decision || 'uncertain';
+            const confidence = aiResult.confidence || 0;
+            const reasoning = aiResult.reasoning || 'No reasoning provided';
+            const evidenceQuotes = aiResult.evidence_quotes || [];
+            const picoScores = aiResult.pico_scores || {};
+            
+            const decisionClass = decision === 'include' ? 'decision-include' : 
+                                decision === 'exclude' ? 'decision-exclude' : 'decision-uncertain';
+            
+            return `
+                <div class="ai-result">
+                    <h5>${title}</h5>
+                    <div class="decision-badge ${decisionClass}">${decision}</div>
+                    <div class="confidence-score">
+                        <strong>Confidence:</strong> ${confidence.toFixed(1)}%
+                    </div>
+                    
+                    <div class="reasoning-text">
+                        <strong>Reasoning:</strong><br>
+                        ${reasoning}
+                    </div>
+                    
+                    ${evidenceQuotes.length > 0 ? `
+                        <div class="evidence-quotes">
+                            <strong>Evidence Quotes:</strong>
+                            <ul>
+                                ${evidenceQuotes.map(quote => `<li>"${quote}"</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    
+                    ${Object.keys(picoScores).length > 0 ? `
+                        <div class="pico-scores">
+                            ${Object.entries(picoScores).map(([key, value]) => `
+                                <div class="pico-score">
+                                    <div class="pico-score-value">${(value * 100).toFixed(0)}%</div>
+                                    <div class="pico-score-label">${key}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function closeCitationModal() {
+            document.getElementById('citationModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('citationModal');
+            if (event.target === modal) {
+                closeCitationModal();
+            }
+        }
     </script>
 </body>
 </html>
@@ -3164,6 +3327,34 @@ async def stream_progress(job_id: str):
             await asyncio.sleep(2)  # Check every 2 seconds
     
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.get("/api/projects/{project_id}/citations/{citation_id}/results")
+async def get_citation_results(project_id: str, citation_id: str, db: Session = Depends(get_db)):
+    """Get screening results for a specific citation"""
+    try:
+        # Find the screening result for this citation
+        result = db.query(ScreeningResult).filter(
+            ScreeningResult.project_id == project_id,
+            ScreeningResult.citation_id == citation_id
+        ).first()
+        
+        if not result:
+            return {"message": "No screening results found for this citation"}
+        
+        return {
+            "citation_id": result.citation_id,
+            "project_id": result.project_id,
+            "status": result.status,
+            "ai1_result": result.ai1_result,
+            "ai2_result": result.ai2_result,
+            "final_decision": result.final_decision,
+            "confidence_score": result.confidence_score,
+            "notes": result.notes,
+            "processed_at": result.processed_at
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching citation results: {str(e)}")
 
 @app.get("/api/projects/{project_id}/export")
 async def export_results(project_id: str, db: Session = Depends(get_db)):
