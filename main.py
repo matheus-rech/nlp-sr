@@ -2298,6 +2298,204 @@ HTML_CONTENT = """
 
         .sort-group {
             display: flex;
+        }
+
+        /* Citations Section */
+        .citations-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fefefe;
+        }
+
+        .citations-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .search-box input {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+
+        .sort-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .citations-carousel {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 1rem;
+        }
+
+        .citation-card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 1rem;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .citation-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .citation-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+            line-height: 1.3;
+        }
+
+        .citation-meta {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .citation-abstract {
+            color: #34495e;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            margin-bottom: 0.5rem;
+            max-height: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+        }
+
+        .citation-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #eee;
+        }
+
+        .relevance-score {
+            background-color: #3498db;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .citation-status {
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .status-ready {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        .status-processing {
+            background-color: #f39c12;
+            color: white;
+        }
+
+        .status-completed {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        /* Metrics Panel */
+        .metrics-panel {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .metric-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .metric-card h4 {
+            margin: 0 0 1rem 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 0.5rem;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            padding: 0.3rem 0;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .export-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .export-controls .config-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0;
+        }
+
+        .export-controls label {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .export-controls select,
+        .export-controls input[type="checkbox"] {
+            margin-left: 0.5rem;
             align-items: center;
             gap: 0.5rem;
         }
@@ -2797,6 +2995,103 @@ HTML_CONTENT = """
             <button onclick="pauseScreening()" id="pauseBtn" disabled>Pause</button>
             <button onclick="exportResults()" id="exportBtn">Export Results</button>
         </div>
+
+        <!-- Citations Display Section -->
+        <div id="citationsSection" class="citations-section" style="display: none;">
+            <h3>Uploaded Citations</h3>
+            <div class="citations-controls">
+                <div class="search-box">
+                    <input type="text" id="citationSearch" placeholder="Search citations..." onkeyup="filterCitations()">
+                    <button onclick="clearSearch()">Clear</button>
+                </div>
+                <div class="sort-controls">
+                    <label>Sort by:</label>
+                    <select id="sortCitations" onchange="sortCitations()">
+                        <option value="relevance">Relevance Score</option>
+                        <option value="title">Title</option>
+                        <option value="year">Year</option>
+                        <option value="authors">Authors</option>
+                        <option value="journal">Journal</option>
+                    </select>
+                </div>
+            </div>
+            <div id="citationsCarousel" class="citations-carousel">
+                <!-- Citations will be dynamically loaded here -->
+            </div>
+        </div>
+
+        <!-- Performance Metrics Panel -->
+        <div id="metricsPanel" class="metrics-panel" style="display: none;">
+            <h3>Performance Metrics</h3>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h4>Processing Overview</h4>
+                    <div id="processingStats">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Citations:</span>
+                            <span class="stat-value" id="totalCitations">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Processed:</span>
+                            <span class="stat-value" id="processedCitations">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Included:</span>
+                            <span class="stat-value" id="includedCitations">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Excluded:</span>
+                            <span class="stat-value" id="excludedCitations">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <h4>AI Performance</h4>
+                    <div id="aiPerformanceStats">
+                        <div class="stat-item">
+                            <span class="stat-label">Avg Response Time:</span>
+                            <span class="stat-value" id="avgResponseTime">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Avg Confidence:</span>
+                            <span class="stat-value" id="avgConfidence">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Success Rate:</span>
+                            <span class="stat-value" id="successRate">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Conflicts:</span>
+                            <span class="stat-value" id="conflictCount">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <h4>Export & Storage</h4>
+                    <div class="export-controls">
+                        <div class="config-row">
+                            <label>Export Format:</label>
+                            <select id="exportFormat">
+                                <option value="json">JSON (Detailed)</option>
+                                <option value="csv">CSV (Tabular)</option>
+                                <option value="excel">Excel (Multi-sheet)</option>
+                            </select>
+                        </div>
+                        <div class="config-row">
+                            <label>Include Metadata:</label>
+                            <input type="checkbox" id="includeMetadata" checked>
+                        </div>
+                        <div class="config-row">
+                            <label>Save Processing Log:</label>
+                            <input type="checkbox" id="saveProcessingLog" checked>
+                        </div>
+                        <button onclick="exportWithOptions()" class="export-btn">Export with Options</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="main-content">
@@ -3013,6 +3308,20 @@ HTML_CONTENT = """
         };
         let providerConfigs = {};
         
+        // Citation Management Variables
+        let uploadedCitations = [];
+        let filteredCitations = [];
+        let performanceMetrics = {
+            totalCitations: 0,
+            processedCitations: 0,
+            includedCitations: 0,
+            excludedCitations: 0,
+            avgResponseTime: 0,
+            avgConfidence: 0,
+            successRate: 0,
+            conflictCount: 0
+        };
+        
         // Abstract Navigator Variables
         let currentAbstractIndex = 0;
         let filteredReferences = [];
@@ -3172,6 +3481,7 @@ HTML_CONTENT = """
             }
 
             try {
+                showStatusMessage('Uploading and parsing files...', 'info');
                 const response = await fetch('/api/upload', {
                     method: 'POST',
                     body: formData
@@ -3182,13 +3492,186 @@ HTML_CONTENT = """
                 const result = await response.json();
                 currentProject = result.project_id;
                 
-                // Display uploaded citations immediately using carousel
-                if (result.citations && result.citations.length > 0) {
-                    references = result.citations;
-                    displayCitationCarousel(result.citations);
-                    updateDisplay();
-                } else {
-                    // Fallback to fetching if no citations in response
+                // Store citations data
+                uploadedCitations = result.citations || [];
+                filteredCitations = [...uploadedCitations];
+                references = uploadedCitations;
+                
+                // Update metrics
+                performanceMetrics.totalCitations = uploadedCitations.length;
+                updateMetricsDisplay();
+                
+                // Display citations immediately
+                displayCitations();
+                
+                showStatusMessage(`Successfully uploaded ${result.citations_count} citations`, 'success');
+                
+                // Enable screening controls
+                updateStartButton();
+                
+                // Log activity
+                addActivityLog(`Uploaded ${result.citations_count} citations`, 'success');
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                showStatusMessage(`Upload failed: ${error.message}`, 'error');
+                addActivityLog(`Upload failed: ${error.message}`, 'error');
+            }
+        }
+
+        function displayCitations() {
+            const citationsSection = document.getElementById('citationsSection');
+            const citationsCarousel = document.getElementById('citationsCarousel');
+            const metricsPanel = document.getElementById('metricsPanel');
+            
+            if (filteredCitations.length === 0) {
+                citationsSection.style.display = 'none';
+                metricsPanel.style.display = 'none';
+                return;
+            }
+            
+            citationsSection.style.display = 'block';
+            metricsPanel.style.display = 'block';
+            
+            citationsCarousel.innerHTML = '';
+            
+            filteredCitations.forEach((citation, index) => {
+                const card = createCitationCard(citation, index);
+                citationsCarousel.appendChild(card);
+            });
+        }
+
+        function createCitationCard(citation, index) {
+            const card = document.createElement('div');
+            card.className = 'citation-card';
+            card.setAttribute('data-index', index);
+            
+            // Calculate relevance score display
+            const relevanceScore = citation.relevance_score || 0.5;
+            const scoreColor = relevanceScore > 0.7 ? '#27ae60' : relevanceScore > 0.4 ? '#f39c12' : '#e74c3c';
+            
+            card.innerHTML = `
+                <div class="citation-title">${citation.title || 'No title available'}</div>
+                <div class="citation-meta">
+                    <strong>Authors:</strong> ${citation.authors || 'Unknown'}<br>
+                    <strong>Journal:</strong> ${citation.journal || 'Unknown'} 
+                    ${citation.year ? `(${citation.year})` : ''}
+                    ${citation.doi ? `<br><strong>DOI:</strong> ${citation.doi}` : ''}
+                </div>
+                <div class="citation-abstract">
+                    ${citation.abstract ? citation.abstract.substring(0, 200) + (citation.abstract.length > 200 ? '...' : '') : 'No abstract available'}
+                </div>
+                ${citation.keywords ? `<div class="citation-meta"><strong>Keywords:</strong> ${citation.keywords}</div>` : ''}
+                <div class="citation-footer">
+                    <span class="relevance-score" style="background-color: ${scoreColor}">
+                        Relevance: ${(relevanceScore * 100).toFixed(0)}%
+                    </span>
+                    <span class="citation-status status-ready">Ready</span>
+                </div>
+            `;
+            
+            return card;
+        }
+
+        function filterCitations() {
+            const searchTerm = document.getElementById('citationSearch').value.toLowerCase();
+            
+            if (!searchTerm.trim()) {
+                filteredCitations = [...uploadedCitations];
+            } else {
+                filteredCitations = uploadedCitations.filter(citation => {
+                    return (citation.title && citation.title.toLowerCase().includes(searchTerm)) ||
+                           (citation.authors && citation.authors.toLowerCase().includes(searchTerm)) ||
+                           (citation.journal && citation.journal.toLowerCase().includes(searchTerm)) ||
+                           (citation.abstract && citation.abstract.toLowerCase().includes(searchTerm)) ||
+                           (citation.keywords && citation.keywords.toLowerCase().includes(searchTerm)) ||
+                           (citation.year && citation.year.toString().includes(searchTerm));
+                });
+            }
+            
+            displayCitations();
+        }
+
+        function clearSearch() {
+            document.getElementById('citationSearch').value = '';
+            filteredCitations = [...uploadedCitations];
+            displayCitations();
+        }
+
+        function sortCitations() {
+            const sortBy = document.getElementById('sortCitations').value;
+            
+            filteredCitations.sort((a, b) => {
+                switch(sortBy) {
+                    case 'relevance':
+                        return (b.relevance_score || 0.5) - (a.relevance_score || 0.5);
+                    case 'title':
+                        return (a.title || '').localeCompare(b.title || '');
+                    case 'year':
+                        return (b.year || 0) - (a.year || 0);
+                    case 'authors':
+                        return (a.authors || '').localeCompare(b.authors || '');
+                    case 'journal':
+                        return (a.journal || '').localeCompare(b.journal || '');
+                    default:
+                        return 0;
+                }
+            });
+            
+            displayCitations();
+        }
+
+        function updateMetricsDisplay() {
+            document.getElementById('totalCitations').textContent = performanceMetrics.totalCitations;
+            document.getElementById('processedCitations').textContent = performanceMetrics.processedCitations;
+            document.getElementById('includedCitations').textContent = performanceMetrics.includedCitations;
+            document.getElementById('excludedCitations').textContent = performanceMetrics.excludedCitations;
+            document.getElementById('avgResponseTime').textContent = 
+                performanceMetrics.avgResponseTime > 0 ? `${performanceMetrics.avgResponseTime.toFixed(2)}s` : '-';
+            document.getElementById('avgConfidence').textContent = 
+                performanceMetrics.avgConfidence > 0 ? `${(performanceMetrics.avgConfidence * 100).toFixed(1)}%` : '-';
+            document.getElementById('successRate').textContent = 
+                performanceMetrics.successRate > 0 ? `${(performanceMetrics.successRate * 100).toFixed(1)}%` : '-';
+            document.getElementById('conflictCount').textContent = performanceMetrics.conflictCount;
+        }
+
+        function exportWithOptions() {
+            const format = document.getElementById('exportFormat').value;
+            const includeMetadata = document.getElementById('includeMetadata').checked;
+            const saveProcessingLog = document.getElementById('saveProcessingLog').checked;
+            
+            if (!currentProject) {
+                showStatusMessage('No project to export', 'error');
+                return;
+            }
+            
+            // Build export URL with options
+            const params = new URLSearchParams({
+                format: format,
+                include_metadata: includeMetadata,
+                include_log: saveProcessingLog
+            });
+            
+            const exportUrl = `/api/projects/${currentProject}/export?${params}`;
+            
+            // Trigger download
+            const link = document.createElement('a');
+            link.href = exportUrl;
+            link.download = `otto-sr-results-${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xlsx' : format}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showStatusMessage(`Exporting results in ${format.toUpperCase()} format...`, 'info');
+            addActivityLog(`Exported results (${format})`, 'info');
+        }
+
+        // --- Fallback to existing logic ---
+        function displayCitationCarousel(citations) {
+            if (citations && citations.length > 0) {
+                uploadedCitations = citations;
+                filteredCitations = [...citations];
+                displayCitations();
                     await loadReferences();
                     updateDisplay();
                 }
