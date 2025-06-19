@@ -30,6 +30,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.pydantic_v1 import BaseModel as LangChainBaseModel, Field
 
 # --- 1. Configuration & Initialization ---
 
@@ -132,11 +135,111 @@ class AdvancedScreeningCriteria(BaseModel):
     otherExclusion: str = ""
     researchQuestion: str = ""
 
+# --- Enhanced LLM Provider Support ---
+
+class ProviderConfig(BaseModel):
+    name: str
+    display_name: str
+    models: List[str]
+    default_model: str
+    requires_api_key: bool
+    default_endpoint: Optional[str] = None
+    supports_streaming: bool = True
+
+# LLM Provider Configurations
+LLM_PROVIDERS = {
+    "openai": ProviderConfig(
+        name="openai",
+        display_name="OpenAI",
+        models=["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
+        default_model="gpt-4o",
+        requires_api_key=True,
+        supports_streaming=True
+    ),
+    "anthropic": ProviderConfig(
+        name="anthropic",
+        display_name="Anthropic (Claude)",
+        models=["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+        default_model="claude-3-5-sonnet-20241022",
+        requires_api_key=True,
+        supports_streaming=True
+    ),
+    "ollama": ProviderConfig(
+        name="ollama",
+        display_name="Ollama (Local)",
+        models=["llama3.1:8b", "llama3.1:70b", "mistral:7b", "codellama:7b", "phi3:medium"],
+        default_model="llama3.1:8b",
+        requires_api_key=False,
+        default_endpoint="http://localhost:11434",
+        supports_streaming=True
+    ),
+    "lmstudio": ProviderConfig(
+        name="lmstudio",
+        display_name="LM Studio (Local)",
+        models=["local-model", "llama-3.1-8b", "mistral-7b", "codellama-7b"],
+        default_model="local-model",
+        requires_api_key=False,
+        default_endpoint="http://localhost:1234/v1",
+        supports_streaming=True
+    ),
+    "huggingface": ProviderConfig(
+        name="huggingface",
+        display_name="Hugging Face",
+        models=["microsoft/DialoGPT-large", "microsoft/DialoGPT-medium", "facebook/blenderbot-400M-distill"],
+        default_model="microsoft/DialoGPT-large",
+        requires_api_key=True,
+        supports_streaming=False
+    ),
+    "cohere": ProviderConfig(
+        name="cohere",
+        display_name="Cohere",
+        models=["command-r-plus", "command-r", "command", "command-light"],
+        default_model="command-r-plus",
+        requires_api_key=True,
+        supports_streaming=True
+    )
+}
+
 class LLMConfig(BaseModel):
     provider: str
     model: str
     endpoint: str
     api_key: Optional[str] = None
+    temperature: float = 0.1
+    max_tokens: int = 2000
+
+# Structured Output Schema with Pydantic
+class ScreeningDecision(LangChainBaseModel):
+    """Structured screening decision output"""
+    decision: Literal["include", "exclude"] = Field(
+        description="Final decision: 'include' to include the study, 'exclude' to exclude it"
+    )
+    confidence: float = Field(
+        ge=0, le=100, 
+        description="Confidence percentage from 0-100"
+    )
+    reasoning: str = Field(
+        description="Detailed explanation of the decision with specific criteria references"
+    )
+    pico_scores: Dict[str, float] = Field(
+        description="PICO component scores from 0.0-1.0",
+        default_factory=lambda: {
+            "population": 0.5,
+            "intervention": 0.5, 
+            "comparison": 0.5,
+            "outcome": 0.5
+        }
+    )
+    study_design: str = Field(
+        description="Identified study design (e.g., RCT, cohort study, systematic review)"
+    )
+    quality_assessment: Literal["high", "medium", "low", "unclear"] = Field(
+        description="Overall study quality assessment"
+    )
+    key_findings: List[str] = Field(
+        description="Key findings or limitations identified",
+        default_factory=list
+    )
 
 class CitationUploadResponse(BaseModel):
     project_id: str
@@ -287,9 +390,121 @@ def parse_xml_file(content: str) -> List[Dict[str, Any]]:
     
     return citations
 
-# --- 5. Advanced Prompt Engineering ---
+# --- 5. Dynamic LLM Provider Factory ---
 
-def create_advanced_prompt(criteria: AdvancedScreeningCriteria, strategy: Literal["conservative", "pragmatic"]) -> str:
+class LLMProviderFactory:
+    """Factory for creating LLM instances across different providers"""
+    
+    @staticmethod
+    def create_llm(config: LLMConfig):
+        """Create LLM instance based on provider configuration"""
+        provider = config.provider.lower()
+        
+        if provider == "openai":
+            return ChatOpenAI(
+                model=config.model,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+                api_key=config.api_key or os.getenv("OPENAI_API_KEY")
+            )
+        elif provider == "anthropic":
+            try:
+                from langchain_anthropic import ChatAnthropic
+                return ChatAnthropic(
+                    model=config.model,
+                    temperature=config.temperature,
+                    max_tokens=config.max_tokens,
+                    api_key=config.api_key or os.getenv("ANTHROPIC_API_KEY")
+                )
+            except ImportError:
+                raise ImportError("langchain_anthropic not installed. Install with: pip install langchain-anthropic")
+        elif provider == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                return ChatOllama(
+                    model=config.model,
+                    temperature=config.temperature,
+                    base_url=config.endpoint or "http://localhost:11434"
+                )
+            except ImportError:
+                raise ImportError("langchain_ollama not installed. Install with: pip install langchain-ollama")
+        elif provider == "cohere":
+            try:
+                from langchain_cohere import ChatCohere
+                return ChatCohere(
+                    model=config.model,
+                    temperature=config.temperature,
+                    max_tokens=config.max_tokens,
+                    cohere_api_key=config.api_key or os.getenv("COHERE_API_KEY")
+                )
+            except ImportError:
+                raise ImportError("langchain_cohere not installed. Install with: pip install langchain-cohere")
+        else:
+            # Fallback to OpenAI-compatible endpoint for local models
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                model=config.model,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+                base_url=config.endpoint,
+                api_key=config.api_key or "dummy-key"
+            )
+
+# --- 6. Advanced Prompt Engineering with LangChain ---
+
+class PromptTemplateFactory:
+    """Factory for creating dynamic prompt templates"""
+    
+    @staticmethod
+    def create_screening_prompt(strategy: Literal["conservative", "pragmatic"]) -> ChatPromptTemplate:
+        """Create LangChain prompt template for screening"""
+        
+        if strategy == "conservative":
+            persona = "Dr. Sarah Chen, a meticulous Cochrane systematic reviewer"
+            approach = "conservative, rigorous approach that minimizes false positives"
+            decision_rule = "When in doubt, EXCLUDE the study"
+            temperature_note = "Be stringent in your evaluation"
+        else:
+            persona = "Dr. Michael Rodriguez, a pragmatic evidence synthesizer" 
+            approach = "inclusive, pragmatic approach that captures potentially relevant evidence"
+            decision_rule = "When uncertain, lean toward INCLUSION for human review"
+            temperature_note = "Consider broader relevance and transferability"
+
+        system_template = f"""You are {persona} conducting systematic review screening with a {approach}.
+
+EVALUATION APPROACH: {temperature_note}
+DECISION RULE: {decision_rule}
+
+Your task is to evaluate research studies against specific inclusion/exclusion criteria and provide structured output.
+
+RESEARCH QUESTION: {{research_question}}
+
+PICO-TT CRITERIA:
+{{pico_criteria}}
+
+INCLUSION CRITERIA:
+{{inclusion_criteria}}
+
+EXCLUSION CRITERIA:
+{{exclusion_criteria}}
+
+Evaluate the study carefully and provide your assessment in the exact JSON format specified in the output schema.
+{decision_rule}"""
+
+        human_template = """STUDY TO EVALUATE:
+Title: {title}
+Authors: {authors}
+Journal: {journal} ({year})
+Abstract: {abstract}
+
+Please provide your structured evaluation of this study."""
+
+        return ChatPromptTemplate.from_messages([
+            ("system", system_template),
+            ("human", human_template)
+        ])
+
+def create_advanced_prompt(criteria: AdvancedScreeningCriteria, strategy: Literal["conservative", "pragmatic"]) -> ChatPromptTemplate:
     """Create sophisticated prompts based on screening strategy"""
     
     if strategy == "conservative":
@@ -404,12 +619,55 @@ async def advanced_screening_task(result_id: str, job_id: str, llm_configs: Dict
         
         criteria = AdvancedScreeningCriteria(**project.criteria)
         
-        # Generate prompts for both AI models
-        conservative_prompt = create_advanced_prompt(criteria, "conservative")
-        pragmatic_prompt = create_advanced_prompt(criteria, "pragmatic")
+        # Create prompt templates for both strategies
+        conservative_template = PromptTemplateFactory.create_screening_prompt("conservative")
+        pragmatic_template = PromptTemplateFactory.create_screening_prompt("pragmatic")
         
-        # Prepare citation data
-        citation_data = {
+        # Build criteria strings for prompts
+        pico_criteria = []
+        if criteria.population:
+            pico_criteria.append(f"Population: {criteria.population}")
+        if criteria.intervention:
+            pico_criteria.append(f"Intervention: {criteria.intervention}")
+        if criteria.comparison:
+            pico_criteria.append(f"Comparison: {criteria.comparison}")
+        if criteria.outcome:
+            pico_criteria.append(f"Outcomes: {criteria.outcome}")
+        if criteria.timeframe:
+            pico_criteria.append(f"Timeframe: {criteria.timeframe}")
+        if criteria.studyTypes:
+            pico_criteria.append(f"Study Types: {criteria.studyTypes}")
+        
+        inclusion_criteria = []
+        if criteria.inclusionLanguage:
+            inclusion_criteria.append(f"Language: {criteria.inclusionLanguage}")
+        if criteria.inclusionPublication:
+            inclusion_criteria.append(f"Publication: {criteria.inclusionPublication}")
+        if criteria.inclusionSampleSize:
+            inclusion_criteria.append(f"Sample Size: {criteria.inclusionSampleSize}")
+        if criteria.inclusionDataAvailability:
+            inclusion_criteria.append(f"Data: {criteria.inclusionDataAvailability}")
+        if criteria.otherInclusion:
+            inclusion_criteria.append(f"Other: {criteria.otherInclusion}")
+        
+        exclusion_criteria = []
+        if criteria.exclusionStudyTypes:
+            exclusion_criteria.append(f"Study Types: {criteria.exclusionStudyTypes}")
+        if criteria.exclusionPopulations:
+            exclusion_criteria.append(f"Populations: {criteria.exclusionPopulations}")
+        if criteria.exclusionInterventions:
+            exclusion_criteria.append(f"Interventions: {criteria.exclusionInterventions}")
+        if criteria.exclusionLanguages:
+            exclusion_criteria.append(f"Languages: {criteria.exclusionLanguages}")
+        if criteria.otherExclusion:
+            exclusion_criteria.append(f"Other: {criteria.otherExclusion}")
+        
+        # Prepare prompt variables
+        prompt_variables = {
+            "research_question": criteria.researchQuestion or "Systematic review research question not specified",
+            "pico_criteria": "\n".join(pico_criteria) if pico_criteria else "No specific PICO criteria provided",
+            "inclusion_criteria": "\n".join(inclusion_criteria) if inclusion_criteria else "Standard inclusion criteria apply",
+            "exclusion_criteria": "\n".join(exclusion_criteria) if exclusion_criteria else "Standard exclusion criteria apply",
             "title": citation.title or "",
             "authors": citation.authors or "",
             "journal": citation.journal or "",
@@ -417,16 +675,12 @@ async def advanced_screening_task(result_id: str, job_id: str, llm_configs: Dict
             "abstract": citation.abstract or ""
         }
         
-        # Format prompts with citation data
-        conservative_prompt = conservative_prompt.format(**citation_data)
-        pragmatic_prompt = pragmatic_prompt.format(**citation_data)
-        
-        # Call AI models based on configuration
+        # Call AI models with structured prompts
         ai1_config = llm_configs.get('ai1', {})
         ai2_config = llm_configs.get('ai2', {})
         
-        ai1_result = await call_llm_api(ai1_config, conservative_prompt)
-        ai2_result = await call_llm_api(ai2_config, pragmatic_prompt)
+        ai1_result = await call_llm_api(ai1_config, conservative_template, prompt_variables)
+        ai2_result = await call_llm_api(ai2_config, pragmatic_template, prompt_variables)
         
         # Process results
         result.ai1_result = ai1_result
@@ -478,45 +732,58 @@ async def advanced_screening_task(result_id: str, job_id: str, llm_configs: Dict
         db.commit()
         db.close()
 
-async def call_llm_api(config: Dict[str, Any], prompt: str) -> Dict[str, Any]:
-    """Call different LLM APIs based on provider configuration"""
+async def call_llm_api(config: Dict[str, Any], prompt_template: ChatPromptTemplate, prompt_variables: Dict[str, str]) -> Dict[str, Any]:
+    """Call LLM APIs with structured output using LangChain and Pydantic"""
     if not config:
         raise ValueError("LLM configuration not provided")
     
-    provider = config.get('provider', 'openai')
-    
     try:
-        if provider == 'openai':
-            return await call_openai_api(config, prompt)
-        else:
-            # Fallback to OpenAI for now - other providers can be implemented later
-            return await call_openai_api(config, prompt)
+        # Create LLM configuration object
+        llm_config = LLMConfig(**config)
+        
+        # Create LLM instance using factory
+        llm = LLMProviderFactory.create_llm(llm_config)
+        
+        # Create output parser for structured responses
+        output_parser = PydanticOutputParser(pydantic_object=ScreeningDecision)
+        
+        # Create the chain with prompt template, LLM, and output parser
+        chain = prompt_template | llm | output_parser
+        
+        # Add format instructions to prompt variables
+        prompt_variables["format_instructions"] = output_parser.get_format_instructions()
+        
+        # Execute the chain
+        try:
+            structured_result = await chain.ainvoke(prompt_variables)
+            
+            # Convert Pydantic model to dict for database storage
+            return {
+                "decision": structured_result.decision,
+                "confidence": float(structured_result.confidence),
+                "reasoning": structured_result.reasoning,
+                "pico": structured_result.pico_scores,
+                "study_design": structured_result.study_design,
+                "quality_assessment": structured_result.quality_assessment,
+                "key_findings": structured_result.key_findings
+            }
+            
+        except Exception as parse_error:
+            # Fallback to raw response parsing if structured parsing fails
+            raw_response = await llm.ainvoke(prompt_template.format(**prompt_variables))
+            return parse_llm_response(raw_response.content if hasattr(raw_response, 'content') else str(raw_response))
+            
     except Exception as e:
         return {
             "decision": "exclude",
             "confidence": 0,
             "reasoning": f"API Error: {str(e)}",
-            "pico": {"population_score": 0, "intervention_score": 0, "comparison_score": 0, "outcome_score": 0},
+            "pico": {"population": 0, "intervention": 0, "comparison": 0, "outcome": 0},
             "study_design": "Unknown",
-            "quality_assessment": "Error",
+            "quality_assessment": "unclear",
+            "key_findings": [],
             "error": True
         }
-
-async def call_openai_api(config: Dict[str, Any], prompt: str) -> Dict[str, Any]:
-    """Call OpenAI API"""
-    # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-    # do not change this unless explicitly requested by the user
-    llm = ChatOpenAI(
-        model=config.get('model', 'gpt-4o'),
-        temperature=0.1,
-        api_key=config.get('api_key') or os.getenv("OPENAI_API_KEY")
-    )
-    
-    try:
-        response = await llm.ainvoke(prompt)
-        return parse_llm_response(response.content)
-    except Exception as e:
-        raise Exception(f"OpenAI API error: {str(e)}")
 
 def parse_llm_response(response_text: str) -> Dict[str, Any]:
     """Parse LLM response with fallback handling"""
@@ -1289,11 +1556,13 @@ HTML_CONTENT = """
                     <h4>AI Model 1 (Conservative)</h4>
                     <div class="config-row">
                         <label>Provider:</label>
-                        <select id="ai1Provider">
-                            <option value="openai">OpenAI GPT-4</option>
-                            <option value="claude">Claude (Anthropic)</option>
-                            <option value="local-ollama">Local (Ollama)</option>
-                            <option value="local-lmstudio">Local (LM Studio)</option>
+                        <select id="ai1Provider" onchange="updateProviderModels('ai1')">
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="lmstudio">LM Studio (Local)</option>
+                            <option value="huggingface">Hugging Face</option>
+                            <option value="cohere">Cohere</option>
                         </select>
                     </div>
                     <div class="config-row">
@@ -1316,11 +1585,13 @@ HTML_CONTENT = """
                     <h4>AI Model 2 (Pragmatic)</h4>
                     <div class="config-row">
                         <label>Provider:</label>
-                        <select id="ai2Provider">
-                            <option value="openai">OpenAI GPT-4</option>
-                            <option value="claude">Claude (Anthropic)</option>
-                            <option value="local-ollama">Local (Ollama)</option>
-                            <option value="local-lmstudio">Local (LM Studio)</option>
+                        <select id="ai2Provider" onchange="updateProviderModels('ai2')">
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="lmstudio">LM Studio (Local)</option>
+                            <option value="huggingface">Hugging Face</option>
+                            <option value="cohere">Cohere</option>
                         </select>
                     </div>
                     <div class="config-row">
@@ -1759,6 +2030,24 @@ HTML_CONTENT = """
 async def get_frontend():
     """Serve the enhanced frontend"""
     return HTML_CONTENT
+
+@app.get("/api/providers")
+async def get_providers():
+    """Get available LLM providers and their configurations"""
+    return {
+        "providers": {
+            provider_id: {
+                "name": config.name,
+                "display_name": config.display_name,
+                "models": config.models,
+                "default_model": config.default_model,
+                "requires_api_key": config.requires_api_key,
+                "default_endpoint": config.default_endpoint,
+                "supports_streaming": config.supports_streaming
+            }
+            for provider_id, config in LLM_PROVIDERS.items()
+        }
+    }
 
 @app.post("/api/upload")
 async def upload_files(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
