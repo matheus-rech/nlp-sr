@@ -1044,6 +1044,7 @@ async def get_frontend():
             display: flex;
             flex: 1;
             overflow: hidden;
+            min-height: 0;
         }
 
         .left-panel {
@@ -1052,14 +1053,14 @@ async def get_frontend():
             border-right: 1px solid #e0e0e0;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow-y: auto;
+            max-height: calc(100vh - 120px);
         }
 
         .criteria-section {
             padding: 1.5rem;
             border-bottom: 1px solid #e0e0e0;
-            overflow-y: auto;
-            flex: 1;
+            flex-shrink: 0;
         }
 
         .criteria-section h3 {
@@ -1098,6 +1099,7 @@ async def get_frontend():
         .llm-config {
             padding: 1.5rem;
             border-bottom: 1px solid #e0e0e0;
+            flex-shrink: 0;
         }
 
         .llm-config h4 {
@@ -1176,6 +1178,7 @@ async def get_frontend():
         .controls {
             padding: 1.5rem;
             background: #f8f9fa;
+            flex-shrink: 0;
         }
 
         .upload-area {
@@ -1275,7 +1278,7 @@ async def get_frontend():
 
         /* Citations Section */
         .citations-section {
-            margin: 2rem 0;
+            margin: 1rem;
             padding: 1.5rem;
             border: 1px solid #ddd;
             border-radius: 8px;
@@ -1473,15 +1476,17 @@ async def get_frontend():
 
         .main-content {
             flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            padding: 1rem;
+            overflow-y: auto;
+            background: #f5f5f5;
         }
 
         .sidebar {
             background: white;
             padding: 1.5rem;
-            border-bottom: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid #e0e0e0;
         }
 
         .stats-grid {
@@ -1539,16 +1544,17 @@ async def get_frontend():
         }
 
         .reference-list {
-            flex: 1;
-            overflow-y: auto;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
             padding: 1.5rem;
-            background: #fafafa;
+            margin-bottom: 1rem;
         }
 
         .no-references {
             text-align: center;
             color: #999;
-            padding: 3rem;
+            padding: 2rem;
             font-style: italic;
         }
 
@@ -1700,59 +1706,25 @@ async def get_frontend():
                     </select>
                 </div>
 
-                <details>
-                    <summary style="cursor: pointer; margin: 1rem 0; font-weight: 500;">Advanced Inclusion/Exclusion Criteria</summary>
-                    
-                    <div class="form-group">
-                        <label for="inclusionLanguage">Language Requirements</label>
-                        <input type="text" id="inclusionLanguage" placeholder="e.g., English, multilingual">
-                    </div>
+                <div class="form-group">
+                    <label for="inclusionLanguage">Language Requirements</label>
+                    <input type="text" id="inclusionLanguage" placeholder="e.g., English, multilingual">
+                </div>
 
-                    <div class="form-group">
-                        <label for="inclusionPublication">Publication Types</label>
-                        <input type="text" id="inclusionPublication" placeholder="e.g., peer-reviewed, conference abstracts">
-                    </div>
+                <div class="form-group">
+                    <label for="inclusionPublication">Publication Types</label>
+                    <input type="text" id="inclusionPublication" placeholder="e.g., peer-reviewed, conference abstracts">
+                </div>
 
-                    <div class="form-group">
-                        <label for="inclusionSampleSize">Sample Size Requirements</label>
-                        <input type="text" id="inclusionSampleSize" placeholder="e.g., minimum 100 participants">
-                    </div>
+                <div class="form-group">
+                    <label for="otherInclusion">Other Inclusion Criteria</label>
+                    <textarea id="otherInclusion" placeholder="Additional inclusion requirements"></textarea>
+                </div>
 
-                    <div class="form-group">
-                        <label for="inclusionDataAvailability">Data Availability</label>
-                        <input type="text" id="inclusionDataAvailability" placeholder="e.g., full-text available, data extractable">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="otherInclusion">Other Inclusion Criteria</label>
-                        <textarea id="otherInclusion" placeholder="Additional inclusion requirements"></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="exclusionStudyTypes">Excluded Study Types</label>
-                        <input type="text" id="exclusionStudyTypes" placeholder="e.g., case reports, editorials">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="exclusionPopulations">Excluded Populations</label>
-                        <input type="text" id="exclusionPopulations" placeholder="e.g., animal studies, pediatric only">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="exclusionInterventions">Excluded Interventions</label>
-                        <input type="text" id="exclusionInterventions" placeholder="e.g., surgical procedures, medications">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="exclusionLanguages">Excluded Languages</label>
-                        <input type="text" id="exclusionLanguages" placeholder="e.g., non-English publications">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="otherExclusion">Other Exclusion Criteria</label>
-                        <textarea id="otherExclusion" placeholder="Additional exclusion requirements"></textarea>
-                    </div>
-                </details>
+                <div class="form-group">
+                    <label for="otherExclusion">Other Exclusion Criteria</label>
+                    <textarea id="otherExclusion" placeholder="Additional exclusion requirements"></textarea>
+                </div>
             </div>
 
             <!-- LLM Configuration -->
@@ -1855,138 +1827,140 @@ async def get_frontend():
             </div>
         </div>
 
-        <!-- Citations Section -->
-        <div id="citationsSection" class="citations-section" style="display: none;">
-            <h3>Uploaded Citations</h3>
-            <div class="citations-controls">
-                <div class="search-box">
-                    <input type="text" id="citationSearch" placeholder="Search citations..." onkeyup="filterCitations()">
-                    <button onclick="clearSearch()">Clear</button>
-                </div>
-                <div class="sort-controls">
-                    <label>Sort by:</label>
-                    <select id="sortCitations" onchange="sortCitations()">
-                        <option value="relevance">Relevance Score</option>
-                        <option value="title">Title</option>
-                        <option value="year">Year</option>
-                        <option value="authors">Authors</option>
-                        <option value="journal">Journal</option>
-                    </select>
-                </div>
-            </div>
-            <div id="citationsCarousel" class="citations-carousel">
-                <!-- Citations will be dynamically loaded here -->
-            </div>
         </div>
 
-        <!-- Performance Metrics Panel -->
-        <div id="metricsPanel" class="metrics-panel" style="display: none;">
-            <h3>Performance Metrics</h3>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <h4>Processing Overview</h4>
-                    <div id="processingStats">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Citations:</span>
-                            <span class="stat-value" id="totalCitations">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Processed:</span>
-                            <span class="stat-value" id="processedCitations">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Included:</span>
-                            <span class="stat-value" id="includedCitations">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Excluded:</span>
-                            <span class="stat-value" id="excludedCitations">0</span>
-                        </div>
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-number" id="totalCount">0</span>
+                        <div class="stat-label">Total Abstracts</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="processedCount">0</span>
+                        <div class="stat-label">Processed</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="includeCount">0</span>
+                        <div class="stat-label">Included</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="conflictCount">0</span>
+                        <div class="stat-label">Conflicts</div>
                     </div>
                 </div>
                 
-                <div class="metric-card">
-                    <h4>AI Performance</h4>
-                    <div id="aiPerformanceStats">
-                        <div class="stat-item">
-                            <span class="stat-label">Avg Response Time:</span>
-                            <span class="stat-value" id="avgResponseTime">-</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Avg Confidence:</span>
-                            <span class="stat-value" id="avgConfidence">-</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Success Rate:</span>
-                            <span class="stat-value" id="successRate">-</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Conflicts:</span>
-                            <span class="stat-value" id="conflictCount">0</span>
-                        </div>
+                <div class="progress-container">
+                    <div class="progress-label">
+                        <span>Processing Progress</span>
+                        <span id="progressText">0%</span>
                     </div>
-                </div>
-
-                <div class="metric-card">
-                    <h4>Export & Storage</h4>
-                    <div class="export-controls">
-                        <div class="config-row">
-                            <label>Export Format:</label>
-                            <select id="exportFormat">
-                                <option value="json">JSON (Detailed)</option>
-                                <option value="csv">CSV (Tabular)</option>
-                                <option value="excel">Excel (Multi-sheet)</option>
-                            </select>
-                        </div>
-                        <div class="config-row">
-                            <label>Include Metadata:</label>
-                            <input type="checkbox" id="includeMetadata" checked>
-                        </div>
-                        <div class="config-row">
-                            <label>Save Processing Log:</label>
-                            <input type="checkbox" id="saveProcessingLog" checked>
-                        </div>
-                        <button onclick="exportWithOptions()" class="export-btn">Export with Options</button>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="main-content">
-        <div class="sidebar">
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-number" id="totalCount">0</span>
-                    <div class="stat-label">Total Abstracts</div>
+            <!-- Citations Section -->
+            <div id="citationsSection" class="citations-section" style="display: none;">
+                <h3>Uploaded Citations</h3>
+                <div class="citations-controls">
+                    <div class="search-box">
+                        <input type="text" id="citationSearch" placeholder="Search citations..." onkeyup="filterCitations()">
+                        <button onclick="clearSearch()">Clear</button>
+                    </div>
+                    <div class="sort-controls">
+                        <label>Sort by:</label>
+                        <select id="sortCitations" onchange="sortCitations()">
+                            <option value="relevance">Relevance Score</option>
+                            <option value="title">Title</option>
+                            <option value="year">Year</option>
+                            <option value="authors">Authors</option>
+                            <option value="journal">Journal</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="processedCount">0</span>
-                    <div class="stat-label">Processed</div>
+                <div id="citationsCarousel" class="citations-carousel">
+                    <!-- Citations will be dynamically loaded here -->
                 </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="includeCount">0</span>
-                    <div class="stat-label">Included</div>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="conflictCount">0</span>
-                    <div class="stat-label">Conflicts</div>
+            </div>
+
+            <!-- Performance Metrics Panel -->
+            <div id="metricsPanel" class="metrics-panel" style="display: none;">
+                <h3>Performance Metrics</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h4>Processing Overview</h4>
+                        <div id="processingStats">
+                            <div class="stat-item">
+                                <span class="stat-label">Total Citations:</span>
+                                <span class="stat-value" id="totalCitations">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Processed:</span>
+                                <span class="stat-value" id="processedCitations">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Included:</span>
+                                <span class="stat-value" id="includedCitations">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Excluded:</span>
+                                <span class="stat-value" id="excludedCitations">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <h4>AI Performance</h4>
+                        <div id="aiPerformanceStats">
+                            <div class="stat-item">
+                                <span class="stat-label">Avg Response Time:</span>
+                                <span class="stat-value" id="avgResponseTime">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Avg Confidence:</span>
+                                <span class="stat-value" id="avgConfidence">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Success Rate:</span>
+                                <span class="stat-value" id="successRate">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Conflicts:</span>
+                                <span class="stat-value" id="conflictCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <h4>Export & Storage</h4>
+                        <div class="export-controls">
+                            <div class="config-row">
+                                <label>Export Format:</label>
+                                <select id="exportFormat">
+                                    <option value="json">JSON (Detailed)</option>
+                                    <option value="csv">CSV (Tabular)</option>
+                                    <option value="excel">Excel (Multi-sheet)</option>
+                                </select>
+                            </div>
+                            <div class="config-row">
+                                <label>Include Metadata:</label>
+                                <input type="checkbox" id="includeMetadata" checked>
+                            </div>
+                            <div class="config-row">
+                                <label>Save Processing Log:</label>
+                                <input type="checkbox" id="saveProcessingLog" checked>
+                            </div>
+                            <button onclick="exportWithOptions()" class="export-btn">Export with Options</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <div class="progress-container">
-                <div class="progress-label">
-                    <span>Processing Progress</span>
-                    <span id="progressText">0%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
-                </div>
+            <div class="reference-list" id="referenceList">
+                <div class="no-references">Configure LLM connections and upload files to begin screening</div>
             </div>
-        </div>
-        
-        <div class="reference-list" id="referenceList">
-            <div class="no-references">Configure LLM connections and upload files to begin screening</div>
         </div>
     </div>
 
