@@ -1185,22 +1185,61 @@ async def get_frontend():
         }
 
         .upload-area {
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            padding: 2rem;
+            border: 3px dashed #4a90e2;
+            border-radius: 12px;
+            padding: 3rem 2rem;
             text-align: center;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             cursor: pointer;
-            transition: border-color 0.3s;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%);
+            position: relative;
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.1);
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         .upload-area:hover {
-            border-color: #667eea;
+            border-color: #2c5aa0;
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(74, 144, 226, 0.2);
         }
 
         .upload-area.dragover {
-            border-color: #667eea;
-            background-color: #f0f4ff;
+            border-color: #1565c0;
+            background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(74, 144, 226, 0.3);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.7;
+            color: #4a90e2;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c5aa0;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-subtext {
+            font-size: 0.95rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .supported-formats {
+            font-size: 0.85rem;
+            color: #888;
+            font-style: italic;
         }
 
         .upload-area input {
@@ -2144,8 +2183,10 @@ async def get_frontend():
                 </div>
 
                 <div class="upload-area" id="uploadArea">
-                    <div>Drop citation files here or click to browse</div>
-                    <small>Supports: RIS, XML, EndNote (.enw), Mendeley (.bib), Zotero (.rdf, .json)</small>
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Drop citation files here or click to browse</div>
+                    <div class="upload-subtext">Start your systematic review by uploading citation files</div>
+                    <div class="supported-formats">Supports: RIS, XML, EndNote (.enw), Mendeley (.bib), Zotero (.rdf, .json)</div>
                     <input type="file" id="fileInput" accept=".xml,.ris,.enw,.bib,.rdf,.json" multiple />
                 </div>
 
