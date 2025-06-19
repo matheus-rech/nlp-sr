@@ -119,6 +119,10 @@ uvicorn main:app --host 0.0.0.0 --port 5000
 ### Core Features Implemented
 - **PICO-TT Criteria Configuration**: Comprehensive systematic review setup
 - **Dual AI Screening**: Conservative vs pragmatic approaches with conflict detection
+- **Abstract Navigation Interface**: Interactive component for reviewing screening results
+- **Comprehensive Metrics Panel**: Real-time statistics and progress visualization
+- **Advanced Filtering System**: Filter abstracts by inclusion/exclusion status
+- **Detailed AI Evaluation Display**: Side-by-side comparison of AI reasoning
 - **Real-time Progress Tracking**: Live updates during screening processes
 - **Enhanced File Parsing**: Support for RIS and XML citation formats
 - **Activity Logging**: Complete audit trail of screening decisions
