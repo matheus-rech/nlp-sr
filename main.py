@@ -2093,7 +2093,7 @@ HTML_CONTENT = """
                 <button class="mode-button" onclick="setScreeningMode('batch')" id="batchModeBtn">
                     Batch Screening
                 </button>
-                <button class="mode-button" onclick="setScreeningMode('ai-assisted')" id="aiModeBtn">
+                <button class="mode-button" onclick="setScreeningMode('ai-assisted')" id="ai-assistedModeBtn">
                     AI-Assisted
                 </button>
             </div>
