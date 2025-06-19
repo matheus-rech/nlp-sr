@@ -1432,6 +1432,180 @@ async def get_frontend():
             background: #218838;
         }
 
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 1000px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .citation-detail {
+            margin-bottom: 2rem;
+        }
+
+        .citation-detail h4 {
+            color: #333;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #007bff;
+        }
+
+        .citation-meta-detail {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+        }
+
+        .ai-analysis {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .ai-result {
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 1rem;
+        }
+
+        .ai-result h5 {
+            margin-top: 0;
+            color: #333;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .decision-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .decision-include {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .decision-exclude {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .decision-uncertain {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .confidence-score {
+            background: #e9ecef;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .reasoning-text {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-left: 4px solid #007bff;
+            margin: 1rem 0;
+            font-style: italic;
+        }
+
+        .evidence-quotes {
+            background: #fff3cd;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+        }
+
+        .evidence-quotes ul {
+            margin: 0.5rem 0 0 0;
+            padding-left: 1.5rem;
+        }
+
+        .pico-scores {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .pico-score {
+            text-align: center;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .pico-score-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #007bff;
+        }
+
+        .pico-score-label {
+            font-size: 0.8rem;
+            color: #666;
+            text-transform: uppercase;
+        }
+
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -1981,6 +2155,19 @@ async def get_frontend():
                 <div class="no-references">Configure LLM connections and upload files to begin screening</div>
             </div>
         </div>
+
+        <!-- Citation Detail Modal -->
+        <div id="citationModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Citation Details & AI Analysis</h3>
+                    <span class="close" onclick="closeCitationModal()">&times;</span>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- Citation details and AI analysis will be populated here -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -2143,9 +2330,12 @@ async def get_frontend():
         function setScreeningMode(mode) {
             screeningMode = mode;
             
-            // Update button states
+            // Update button states safely
             document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(mode + 'ModeBtn').classList.add('active');
+            const modeBtn = document.getElementById(mode + 'ModeBtn');
+            if (modeBtn) {
+                modeBtn.classList.add('active');
+            }
             
             updateStartButton();
         }
@@ -2285,6 +2475,7 @@ async def get_frontend():
                         Relevance: ${(relevanceScore * 100).toFixed(0)}%
                     </span>
                     <span class="citation-status status-ready">Ready</span>
+                    <button class="view-details-btn" onclick="showCitationDetails('${citation.id}')">View Details</button>
                 </div>
             `;
             
