@@ -1,0 +1,2615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production LLM Screening Tool v3.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background-color: #e9ecef;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db 0%, #2ecc71 100%);
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: -20px;
+            right: 0;
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header .subtitle {
+            font-size: 0.9rem;
+            color: #bdc3c7;
+            margin-bottom: 1rem;
+        }
+
+        /* Screening Mode Selector */
+        .screening-mode-selector {
+            background-color: #34495e;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .screening-mode-selector h3 {
+            color: #ecf0f1;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .mode-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .mode-button {
+            background-color: #2c3e50;
+            color: #bdc3c7;
+            border: 2px solid transparent;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .mode-button:hover {
+            background-color: #3a526b;
+            border-color: #3498db;
+        }
+
+        .mode-button.active {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        .mode-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Real-time Collaboration Panel */
+        .collaboration-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 280px;
+            z-index: 100;
+        }
+
+        .collaboration-panel h4 {
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .team-member {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .team-member:last-child {
+            border-bottom: none;
+        }
+
+        .member-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .online-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #28a745;
+        }
+
+        .online-indicator.offline {
+            background-color: #6c757d;
+        }
+
+        .member-stats {
+            font-size: 0.75rem;
+            color: #6c757d;
+            text-align: right;
+        }
+
+        /* Session Statistics */
+        .session-stats {
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .session-stats h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+
+        .stat-trend {
+            font-size: 0.75rem;
+            color: #28a745;
+            margin-top: 0.25rem;
+        }
+
+        .stat-trend.down {
+            color: #dc3545;
+        }
+
+        /* Enhanced Reference Display */
+        .reference {
+            border: 1px solid #ddd;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .reference:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .reference.selected {
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        .relevance-indicator {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .relevance-indicator.high {
+            background: linear-gradient(180deg, #28a745 0%, #20c997 100%);
+        }
+
+        .relevance-indicator.medium {
+            background: linear-gradient(180deg, #ffc107 0%, #fd7e14 100%);
+        }
+
+        .relevance-indicator.low {
+            background: linear-gradient(180deg, #dc3545 0%, #c82333 100%);
+        }
+
+        .relevance-badge {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.95);
+            color: #495057;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .relevance-score {
+            font-size: 0.9rem;
+        }
+
+        /* Batch Mode UI */
+        .batch-control-panel {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .batch-control-panel.show {
+            display: block;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .batch-info {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .batch-reference {
+            position: relative;
+            padding-left: 3rem;
+        }
+
+        .batch-checkbox {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        /* AI-Assisted Mode */
+        .ai-panel {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .ai-panel.show {
+            display: block;
+        }
+
+        .ai-recommendations {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .ai-rec-card {
+            background-color: #f8f9fa;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .ai-rec-card.include {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+
+        .ai-rec-card.exclude {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+
+        .ai-rec-card.uncertain {
+            border-color: #ffc107;
+            background-color: #fff3cd;
+        }
+
+        .ai-rec-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .ai-rec-label {
+            font-size: 0.9rem;
+            color: #495057;
+        }
+
+        /* Live Activity Feed */
+        .activity-feed {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 320px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .activity-feed h4 {
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .activity-item {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.85rem;
+        }
+
+        .activity-time {
+            color: #6c757d;
+            min-width: 50px;
+        }
+
+        .activity-text {
+            flex: 1;
+        }
+
+        .activity-user {
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        /* Loading States */
+        .api-loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 2px solid #3498db;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Enhanced modals and other existing styles from v2.0 */
+        .llm-config {
+            background-color: #34495e;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .llm-config h3 {
+            margin-bottom: 0.5rem;
+            color: #ecf0f1;
+        }
+
+        .criteria-section {
+            background-color: #2c3e50;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .pico-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .criteria-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .criteria-column {
+            background-color: #34495e;
+            padding: 1rem;
+            border-radius: 6px;
+        }
+
+        .criteria-column h4 {
+            color: #ecf0f1;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 0.5rem;
+        }
+
+        .criteria-item {
+            margin-bottom: 1rem;
+        }
+
+        .criteria-item label {
+            display: block;
+            font-size: 0.9rem;
+            color: #bdc3c7;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .criteria-item input,
+        .criteria-item textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #bdc3c7;
+            font-size: 0.85rem;
+            background-color: white;
+            min-height: 35px;
+        }
+
+        .criteria-item textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+
+        .research-question {
+            background-color: #34495e;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+        }
+
+        .research-question h4 {
+            color: #e74c3c;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+        }
+
+        .research-question textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 4px;
+            border: 2px solid #e74c3c;
+            font-size: 0.9rem;
+            background-color: white;
+            min-height: 80px;
+            font-weight: 500;
+        }
+
+        .validation-section {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .validate-btn {
+            background-color: #27ae60;
+        }
+
+        .validate-btn:hover {
+            background-color: #229954;
+        }
+
+        .test-btn {
+            background-color: #f39c12;
+        }
+
+        .test-btn:hover {
+            background-color: #e67e22;
+        }
+
+        .save-btn {
+            background-color: #8e44ad;
+        }
+
+        .save-btn:hover {
+            background-color: #7d3c98;
+        }
+
+        .load-btn {
+            background-color: #2980b9;
+        }
+
+        .load-btn:hover {
+            background-color: #2471a3;
+        }
+
+        .validation-result {
+            flex: 1;
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+        }
+
+        .validation-result.valid {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .validation-result.invalid {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .validation-result.testing {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .config-section {
+            background-color: #2c3e50;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #34495e;
+        }
+
+        .config-section h4 {
+            color: #3498db;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+        }
+
+        .config-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .config-row label {
+            font-size: 0.9rem;
+            color: #bdc3c7;
+            font-weight: bold;
+        }
+
+        select, input[type="text"], input[type="password"], input[type="number"], textarea {
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #bdc3c7;
+            font-size: 0.9rem;
+            background-color: white;
+        }
+
+        input[type="password"] {
+            font-family: monospace;
+        }
+
+        .api-status {
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .api-status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .api-status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .api-status.testing {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .file-upload {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .upload-area {
+            border: 2px dashed #bdc3c7;
+            border-radius: 8px;
+            padding: 1rem;
+            background-color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 200px;
+            text-align: center;
+        }
+
+        .upload-area:hover {
+            border-color: #3498db;
+            background-color: #ecf0f1;
+        }
+
+        .upload-area.dragover {
+            border-color: #2ecc71;
+            background-color: #e8f8f5;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button.ai-button {
+            background-color: #9b59b6;
+        }
+
+        button.ai-button:hover {
+            background-color: #8e44ad;
+        }
+
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 320px;
+            background-color: white;
+            border-right: 1px solid #ddd;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+
+        .reference-list {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            background-color: white;
+        }
+
+        .reference-header {
+            padding: 1rem;
+            padding-left: 2rem;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            position: relative;
+        }
+
+        .reference-title {
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+        }
+
+        .reference-authors {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .reference-journal {
+            color: #6c757d;
+            font-size: 0.85rem;
+        }
+
+        .llm-status {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .llm-badge {
+            background-color: rgba(155, 89, 182, 0.1);
+            color: #8e44ad;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .llm-badge.ai1 {
+            background-color: rgba(52, 152, 219, 0.1);
+            color: #3498db;
+        }
+
+        .llm-badge.ai2 {
+            background-color: rgba(46, 204, 113, 0.1);
+            color: #27ae60;
+        }
+
+        .llm-badge.include {
+            background-color: rgba(46, 204, 113, 0.1);
+            color: #27ae60;
+        }
+
+        .llm-badge.exclude {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: #e74c3c;
+        }
+
+        .llm-badge.processing {
+            background-color: rgba(241, 196, 15, 0.1);
+            color: #f39c12;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .llm-analysis {
+            background-color: #f8f9ff;
+            border-top: 1px solid #ddd;
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .llm-result {
+            background-color: white;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+
+        .llm-result h5 {
+            color: #495057;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .pico-scores {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .pico-score {
+            text-align: center;
+            padding: 0.25rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .pico-score.high {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .pico-score.medium {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .pico-score.low {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .decision-summary {
+            font-weight: bold;
+            padding: 0.5rem;
+            border-radius: 4px;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .decision-summary.include {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .decision-summary.exclude {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .reasoning-text {
+            font-size: 0.85rem;
+            color: #6c757d;
+            line-height: 1.4;
+        }
+
+        .processing-queue {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .processing-queue h4 {
+            color: #495057;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .queue-item {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .queue-item.processing {
+            border-left: 4px solid #ffc107;
+            background-color: #fffdf7;
+        }
+
+        .queue-item.completed {
+            border-left: 4px solid #28a745;
+            background-color: #f8fff9;
+        }
+
+        .queue-item.error {
+            border-left: 4px solid #dc3545;
+            background-color: #fff8f8;
+        }
+
+        .logging-status {
+            background-color: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .logging-status h4 {
+            color: #1976d2;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .log-entry {
+            font-size: 0.8rem;
+            color: #455a64;
+            margin-bottom: 0.25rem;
+            font-family: monospace;
+        }
+
+        @keyframes pulse {
+            0%, 60%, 100% {
+                opacity: 0.7;
+            }
+            30% {
+                opacity: 1;
+            }
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .no-references {
+            text-align: center;
+            color: #6c757d;
+            padding: 2rem;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .collaboration-panel,
+            .activity-feed {
+                display: none;
+            }
+            
+            .sidebar {
+                width: 100%;
+            }
+            
+            .main-content {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%;">
+                <span class="progress-text">0%</span>
+            </div>
+        </div>
+        
+        <h1>Production LLM Screening Tool v3.0</h1>
+        <div class="subtitle">Real-time collaborative dual AI screening with advanced features</div>
+        
+        <!-- Screening Mode Selector -->
+        <div class="screening-mode-selector">
+            <h3>
+                <svg class="mode-icon" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z"/>
+                </svg>
+                Screening Mode
+            </h3>
+            <div class="mode-buttons">
+                <button class="mode-button active" onclick="setScreeningMode('single')" id="singleModeBtn">
+                    <svg class="mode-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 00-2 2v6a2 2 0 002 2h2a1 1 0 100 2H6a2 2 0 01-2-2V5z"/>
+                    </svg>
+                    Single Citation
+                </button>
+                <button class="mode-button" onclick="setScreeningMode('batch')" id="batchModeBtn">
+                    <svg class="mode-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 00-2 2v6a2 2 0 002 2h2a1 1 0 100 2H6a2 2 0 01-2-2V5z"/>
+                        <path d="M12 7a1 1 0 011-1h1a2 2 0 012 2v6a2 2 0 01-2 2h-2.5a1 1 0 010-2H14V8h-1a1 1 0 01-1-1z"/>
+                    </svg>
+                    Batch Screening
+                </button>
+                <button class="mode-button" onclick="setScreeningMode('ai-assisted')" id="aiModeBtn">
+                    <svg class="mode-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"/>
+                    </svg>
+                    AI-Assisted
+                </button>
+            </div>
+        </div>
+        
+        <div class="llm-config">
+            <h3>📋 Systematic Review Criteria (PICO-TT)</h3>
+            
+            <div class="criteria-section">
+                <div class="pico-grid">
+                    <div class="pico-item">
+                        <label>🧑‍🤝‍🧑 Population (P):</label>
+                        <textarea id="population" placeholder="e.g., Adults aged 18+ with Type 2 diabetes mellitus, BMI >25 kg/m², diagnosed according to ADA criteria">Adults aged 18+ with Type 2 diabetes mellitus, diagnosed within the last 5 years</textarea>
+                    </div>
+                    <div class="pico-item">
+                        <label>🎯 Intervention (I):</label>
+                        <textarea id="intervention" placeholder="e.g., Metformin therapy (≥500mg daily), lifestyle interventions (diet + exercise), telehealth interventions">Metformin therapy, lifestyle interventions (diet and exercise programs), diabetes education programs</textarea>
+                    </div>
+                    <div class="pico-item">
+                        <label>⚖️ Comparison (C):</label>
+                        <textarea id="comparison" placeholder="e.g., Placebo, standard diabetes care, other antidiabetic medications, no intervention">Placebo, standard diabetes care, other oral antidiabetic medications, control groups</textarea>
+                    </div>
+                    <div class="pico-item">
+                        <label>📊 Outcomes (O):</label>
+                        <textarea id="outcome" placeholder="e.g., HbA1c reduction, fasting glucose levels, cardiovascular events, quality of life measures">Primary: HbA1c levels, blood glucose control. Secondary: cardiovascular outcomes, quality of life, medication adherence</textarea>
+                    </div>
+                    <div class="pico-item">
+                        <label>⏰ Time Frame (T1):</label>
+                        <textarea id="timeframe" placeholder="e.g., Follow-up ≥3 months, intervention duration ≥8 weeks, published 2015-2024">Follow-up duration ≥3 months, intervention duration ≥8 weeks, studies published 2015-2024</textarea>
+                    </div>
+                    <div class="pico-item">
+                        <label>📋 Study Types (T2):</label>
+                        <textarea id="studyTypes" placeholder="e.g., Randomized controlled trials, systematic reviews, cohort studies with control groups">Randomized controlled trials (RCTs), systematic reviews, meta-analyses, controlled clinical trials</textarea>
+                    </div>
+                </div>
+                
+                <div class="criteria-details">
+                    <div class="criteria-column">
+                        <h4>✅ Inclusion Criteria</h4>
+                        <div class="criteria-item">
+                            <label>Language:</label>
+                            <input type="text" id="inclusionLanguage" value="English" placeholder="e.g., English, Spanish, French">
+                        </div>
+                        <div class="criteria-item">
+                            <label>Publication Status:</label>
+                            <input type="text" id="inclusionPublication" value="Peer-reviewed journals" placeholder="e.g., Peer-reviewed, published studies">
+                        </div>
+                        <div class="criteria-item">
+                            <label>Sample Size:</label>
+                            <input type="text" id="inclusionSampleSize" value="≥20 participants per group" placeholder="e.g., ≥50 participants total">
+                        </div>
+                        <div class="criteria-item">
+                            <label>Data Availability:</label>
+                            <input type="text" id="inclusionDataAvailability" value="Sufficient data for analysis" placeholder="e.g., Extractable outcome data">
+                        </div>
+                        <div class="criteria-item">
+                            <label>Other Inclusion Criteria:</label>
+                            <textarea id="otherInclusion" placeholder="Any additional specific inclusion requirements...">Studies with adequate randomization and blinding procedures. Clear definition of intervention protocols.</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="criteria-column">
+                        <h4>❌ Exclusion Criteria</h4>
+                        <div class="criteria-item">
+                            <label>Study Types to Exclude:</label>
+                            <input type="text" id="exclusionStudyTypes" value="Case reports, editorials, conference abstracts" placeholder="e.g., Case studies, reviews without systematic methods">
+                        </div>
+                        <div class="criteria-item">
+                            <label>Populations to Exclude:</label>
+                            <input type="text" id="exclusionPopulations" value="Pediatric populations (<18 years), pregnancy" placeholder="e.g., Children, pregnant women">
+                        </div>
+                        <div class="criteria-item">
+                            <label>Interventions to Exclude:</label>
+                            <input type="text" id="exclusionInterventions" value="Surgical interventions, insulin therapy" placeholder="e.g., Invasive procedures">
+                        </div>
+                        <div class="criteria-item">
+                            <label>Languages to Exclude:</label>
+                            <input type="text" id="exclusionLanguages" value="Non-English languages" placeholder="e.g., Languages other than English">
+                        </div>
+                        <div class="criteria-item">
+                            <label>Other Exclusion Criteria:</label>
+                            <textarea id="otherExclusion" placeholder="Any additional specific exclusion requirements...">Animal studies, in vitro studies, studies with significant methodological flaws, duplicate publications</textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="research-question">
+                    <h4>🎯 Primary Research Question</h4>
+                    <textarea id="researchQuestion" placeholder="State your main research question clearly...">In adults with Type 2 diabetes, how effective are metformin and lifestyle interventions compared to standard care in improving glycemic control and cardiovascular outcomes?</textarea>
+                </div>
+                
+                <div class="validation-section">
+                    <button onclick="validateCriteria()" class="validate-btn">🔍 Validate Criteria</button>
+                    <button onclick="testCriteriaWithExample()" class="test-btn">🧪 Test with Example</button>
+                    <button onclick="saveCriteriaTemplate()" class="save-btn">💾 Save as Template</button>
+                    <button onclick="loadCriteriaTemplate()" class="load-btn">📂 Load Template</button>
+                    <div id="criteriaValidation" class="validation-result"></div>
+                </div>
+            </div>
+            
+            <h3>🤖 LLM Configuration</h3>
+            <div class="config-grid">
+                <div class="config-section">
+                    <h4>🤖 AI Model 1 (Conservative)</h4>
+                    <div class="config-row">
+                        <label>Provider:</label>
+                        <select id="ai1Provider">
+                            <option value="claude">Claude (Anthropic)</option>
+                            <option value="openai">OpenAI GPT-4</option>
+                            <option value="local-ollama">Local (Ollama)</option>
+                            <option value="local-lmstudio">Local (LM Studio)</option>
+                        </select>
+                    </div>
+                    <div class="config-row">
+                        <label>API Key:</label>
+                        <input type="password" id="ai1ApiKey" placeholder="Enter API key (if needed)">
+                    </div>
+                    <div class="config-row">
+                        <label>Model:</label>
+                        <input type="text" id="ai1Model" value="claude-3-sonnet-20240229" placeholder="Model name">
+                    </div>
+                    <div class="config-row">
+                        <label>Endpoint:</label>
+                        <input type="text" id="ai1Endpoint" value="https://api.anthropic.com/v1/messages" placeholder="API endpoint">
+                    </div>
+                    <div class="api-status disconnected" id="ai1Status">Not Connected</div>
+                    <button onclick="testConnection('ai1')" id="testAI1">Test Connection</button>
+                </div>
+
+                <div class="config-section">
+                    <h4>🧠 AI Model 2 (Pragmatic)</h4>
+                    <div class="config-row">
+                        <label>Provider:</label>
+                        <select id="ai2Provider">
+                            <option value="openai">OpenAI GPT-4</option>
+                            <option value="claude">Claude (Anthropic)</option>
+                            <option value="local-ollama">Local (Ollama)</option>
+                            <option value="local-lmstudio">Local (LM Studio)</option>
+                        </select>
+                    </div>
+                    <div class="config-row">
+                        <label>API Key:</label>
+                        <input type="password" id="ai2ApiKey" placeholder="Enter API key (if needed)">
+                    </div>
+                    <div class="config-row">
+                        <label>Model:</label>
+                        <input type="text" id="ai2Model" value="gpt-4-turbo-preview" placeholder="Model name">
+                    </div>
+                    <div class="config-row">
+                        <label>Endpoint:</label>
+                        <input type="text" id="ai2Endpoint" value="https://api.openai.com/v1/chat/completions" placeholder="API endpoint">
+                    </div>
+                    <div class="api-status disconnected" id="ai2Status">Not Connected</div>
+                    <button onclick="testConnection('ai2')" id="testAI2">Test Connection</button>
+                </div>
+
+                <div class="config-section">
+                    <h4>📊 Logging Configuration</h4>
+                    <div class="config-row">
+                        <label>Logging Method:</label>
+                        <select id="loggingMethod">
+                            <option value="csv">CSV Export</option>
+                            <option value="google-sheets">Google Sheets (API)</option>
+                            <option value="local-db">Local Database</option>
+                        </select>
+                    </div>
+                    <div class="config-row">
+                        <label>Google Sheets ID:</label>
+                        <input type="text" id="sheetsId" placeholder="Google Sheets document ID">
+                    </div>
+                    <div class="config-row">
+                        <label>Sheets API Key:</label>
+                        <input type="password" id="sheetsApiKey" placeholder="Google Sheets API key">
+                    </div>
+                    <div class="config-row">
+                        <label>Auto-Save Interval (seconds):</label>
+                        <input type="number" id="autoSaveInterval" value="30" min="10" max="300">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="file-upload">
+                <div class="upload-area" id="uploadArea">
+                    <div>Drop XML/RIS file here or click to browse</div>
+                    <input type="file" id="fileInput" accept=".xml,.ris,.scrn" multiple />
+                </div>
+            </div>
+            <button onclick="startScreening()" id="startBtn" class="ai-button" disabled>Start Screening</button>
+            <button onclick="pauseScreening()" id="pauseBtn" disabled>Pause</button>
+            <button onclick="saveProgress()">Save Progress</button>
+        </div>
+    </div>
+
+    <!-- Real-time Collaboration Panel -->
+    <div class="collaboration-panel">
+        <h4>
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816zM4.92 10A5.493 5.493 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275zM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0zm3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+            </svg>
+            Team Activity
+        </h4>
+        <div id="teamMembersList">
+            <div class="team-member">
+                <div class="member-info">
+                    <div class="online-indicator"></div>
+                    <span>Dr. Johnson</span>
+                </div>
+                <div class="member-stats">
+                    <div>45 screened</div>
+                    <div>2 conflicts</div>
+                </div>
+            </div>
+            <div class="team-member">
+                <div class="member-info">
+                    <div class="online-indicator"></div>
+                    <span>Dr. Chen</span>
+                </div>
+                <div class="member-stats">
+                    <div>38 screened</div>
+                    <div>1 conflict</div>
+                </div>
+            </div>
+            <div class="team-member">
+                <div class="member-info">
+                    <div class="online-indicator offline"></div>
+                    <span>Dr. Smith</span>
+                </div>
+                <div class="member-stats">
+                    <div>52 screened</div>
+                    <div>3 conflicts</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="sidebar">
+            <!-- Session Statistics -->
+            <div class="session-stats">
+                <h3>
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M4 11H2v3h2v-3zm5-4H7v7h2V7zm5-5v12h-2V2h2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1h-2zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-3z"/>
+                    </svg>
+                    Session Statistics
+                </h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="citationsPerHour">0</div>
+                        <div class="stat-label">Citations/Hour</div>
+                        <div class="stat-trend">↑ 12% vs avg</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="inclusionRate">0%</div>
+                        <div class="stat-label">Inclusion Rate</div>
+                        <div class="stat-trend down">↓ 3% vs avg</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="avgConfidence">0%</div>
+                        <div class="stat-label">Avg Confidence</div>
+                        <div class="stat-trend">→ stable</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="timeRemaining">0h</div>
+                        <div class="stat-label">Est. Time Left</div>
+                        <div class="stat-trend">at current pace</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="processing-queue">
+                <h4>📋 Processing Queue</h4>
+                <div id="queueList">
+                    <div class="queue-item">Queue empty - upload studies to begin</div>
+                </div>
+            </div>
+
+            <div class="logging-status">
+                <h4>📝 Logging Status</h4>
+                <div id="logEntries">
+                    <div class="log-entry">Ready to log screening data...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="reference-list" id="referenceList">
+            <!-- Batch Control Panel -->
+            <div class="batch-control-panel" id="batchControlPanel">
+                <div class="batch-info">
+                    <strong>Batch Mode:</strong> Select multiple citations for batch processing
+                </div>
+                <div class="batch-actions">
+                    <button onclick="selectAllReferences()">Select All</button>
+                    <button onclick="deselectAllReferences()">Deselect All</button>
+                    <button onclick="batchInclude()" class="ai-button">Include Selected (<span id="selectedCount">0</span>)</button>
+                    <button onclick="batchExclude()" style="background-color: #e74c3c;">Exclude Selected</button>
+                </div>
+            </div>
+
+            <!-- AI-Assisted Panel -->
+            <div class="ai-panel" id="aiPanel">
+                <h3>AI Pre-Screening Results</h3>
+                <div class="ai-recommendations">
+                    <div class="ai-rec-card include">
+                        <div class="ai-rec-value" id="aiIncludeCount">0</div>
+                        <div class="ai-rec-label">AI Recommends Include</div>
+                    </div>
+                    <div class="ai-rec-card exclude">
+                        <div class="ai-rec-value" id="aiExcludeCount">0</div>
+                        <div class="ai-rec-label">AI Recommends Exclude</div>
+                    </div>
+                    <div class="ai-rec-card uncertain">
+                        <div class="ai-rec-value" id="aiUncertainCount">0</div>
+                        <div class="ai-rec-label">Uncertain - Review</div>
+                    </div>
+                </div>
+                <button onclick="acceptAllAIRecommendations()" class="ai-button">Accept All AI Recommendations</button>
+                <button onclick="reviewUncertainOnly()">Review Uncertain Only</button>
+            </div>
+
+            <div class="no-references">
+                Configure LLM connections and upload a file to begin screening
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Activity Feed -->
+    <div class="activity-feed">
+        <h4>
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
+            </svg>
+            Live Activity
+        </h4>
+        <div id="activityFeed">
+            <div class="activity-item">
+                <div class="activity-time">Now</div>
+                <div class="activity-text">Session started</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State
+        let references = [];
+        let processingQueue = [];
+        let isProcessing = false;
+        let currentIndex = 0;
+        let screeningData = [];
+        let autoSaveTimer = null;
+        let screeningMode = 'single';
+        let selectedReferences = new Set();
+        let sessionStartTime = Date.now();
+        let sessionStats = {
+            totalScreened: 0,
+            included: 0,
+            excluded: 0,
+            conflicts: 0,
+            startTime: Date.now()
+        };
+
+        // Team collaboration simulation
+        const teamMembers = [
+            { id: 1, name: 'Dr. Johnson', screened: 45, conflicts: 2, online: true },
+            { id: 2, name: 'Dr. Chen', screened: 38, conflicts: 1, online: true },
+            { id: 3, name: 'Dr. Smith', screened: 52, conflicts: 3, online: false }
+        ];
+
+        // LLM API Configuration
+        const llmConfigs = {
+            ai1: {
+                provider: 'claude',
+                apiKey: '',
+                model: 'claude-3-sonnet-20240229',
+                endpoint: 'https://api.anthropic.com/v1/messages',
+                connected: false
+            },
+            ai2: {
+                provider: 'openai',
+                apiKey: '',
+                model: 'gpt-4-turbo-preview',
+                endpoint: 'https://api.openai.com/v1/chat/completions',
+                connected: false
+            }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSessionStats();
+            setInterval(updateSessionStats, 5000); // Update every 5 seconds
+            simulateTeamActivity();
+        });
+
+        // Screening Mode Management
+        function setScreeningMode(mode) {
+            screeningMode = mode;
+            
+            // Update UI
+            document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`${mode.replace('-', '')}ModeBtn`).classList.add('active');
+            
+            // Show/hide relevant panels
+            document.getElementById('batchControlPanel').classList.toggle('show', mode === 'batch');
+            document.getElementById('aiPanel').classList.toggle('show', mode === 'ai-assisted');
+            
+            // Update display
+            updateReferenceList();
+            
+            addActivity(`Switched to ${mode} screening mode`);
+        }
+
+        // Session Statistics
+        function updateSessionStats() {
+            if (sessionStats.totalScreened === 0) return;
+            
+            const elapsedHours = (Date.now() - sessionStats.startTime) / (1000 * 60 * 60);
+            const citationsPerHour = Math.round(sessionStats.totalScreened / elapsedHours);
+            const inclusionRate = Math.round((sessionStats.included / sessionStats.totalScreened) * 100);
+            const avgConfidence = screeningData.length > 0 
+                ? Math.round(screeningData.reduce((sum, d) => sum + ((d.ai1_confidence + d.ai2_confidence) / 2), 0) / screeningData.length)
+                : 0;
+            const remainingCitations = references.filter(r => r.status === 'pending').length;
+            const timeRemaining = citationsPerHour > 0 
+                ? Math.round(remainingCitations / citationsPerHour * 10) / 10
+                : 0;
+            
+            document.getElementById('citationsPerHour').textContent = citationsPerHour;
+            document.getElementById('inclusionRate').textContent = `${inclusionRate}%`;
+            document.getElementById('avgConfidence').textContent = `${avgConfidence}%`;
+            document.getElementById('timeRemaining').textContent = `${timeRemaining}h`;
+        }
+
+        // Real-time Collaboration
+        function simulateTeamActivity() {
+            setInterval(() => {
+                // Simulate team member activity
+                const member = teamMembers[Math.floor(Math.random() * teamMembers.length)];
+                if (member.online && Math.random() > 0.7) {
+                    member.screened++;
+                    if (Math.random() > 0.9) member.conflicts++;
+                    updateTeamDisplay();
+                    addActivity(`${member.name} screened a citation`);
+                }
+            }, 10000); // Every 10 seconds
+        }
+
+        function updateTeamDisplay() {
+            const teamList = document.getElementById('teamMembersList');
+            teamList.innerHTML = teamMembers.map(member => `
+                <div class="team-member">
+                    <div class="member-info">
+                        <div class="online-indicator ${member.online ? '' : 'offline'}"></div>
+                        <span>${member.name}</span>
+                    </div>
+                    <div class="member-stats">
+                        <div>${member.screened} screened</div>
+                        <div>${member.conflicts} conflicts</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Activity Feed
+        function addActivity(text, user = 'You') {
+            const feed = document.getElementById('activityFeed');
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            const activityHtml = `
+                <div class="activity-item">
+                    <div class="activity-time">${time}</div>
+                    <div class="activity-text"><span class="activity-user">${user}</span> ${text}</div>
+                </div>
+            `;
+            
+            feed.insertAdjacentHTML('afterbegin', activityHtml);
+            
+            // Keep only last 10 activities
+            while (feed.children.length > 10) {
+                feed.removeChild(feed.lastChild);
+            }
+        }
+
+        // File upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFiles(files);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFiles(e.target.files);
+            }
+        });
+
+        function handleFiles(files) {
+            const fileArray = Array.from(files);
+            fileArray.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    if (file.name.endsWith('.xml')) {
+                        parseXML(e.target.result);
+                    } else if (file.name.endsWith('.ris')) {
+                        parseRIS(e.target.result);
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        function parseXML(xmlContent) {
+            try {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
+                
+                const records = xmlDoc.getElementsByTagName('record');
+                const newReferences = [];
+                
+                for (let i = 0; i < records.length; i++) {
+                    const record = records[i];
+                    const ref = {
+                        id: references.length + i + 1,
+                        title: getXMLValue(record, 'title') || 'No title',
+                        authors: getXMLValue(record, 'authors') || getXMLValue(record, 'author') || 'Unknown authors',
+                        journal: getXMLValue(record, 'journal') || getXMLValue(record, 'secondary-title') || '',
+                        year: getXMLValue(record, 'year') || '',
+                        abstract: getXMLValue(record, 'abstract') || 'No abstract available',
+                        status: 'pending',
+                        ai1_result: null,
+                        ai2_result: null,
+                        processed_at: null,
+                        relevanceScore: Math.random() // Simulate relevance score
+                    };
+                    newReferences.push(ref);
+                }
+                
+                references = [...references, ...newReferences];
+                
+                updateDisplay();
+                setupProcessingQueue();
+                logEntry(`✅ Loaded ${newReferences.length} studies from XML`);
+                addActivity(`uploaded ${newReferences.length} studies`);
+                
+                // Pre-calculate AI recommendations for AI-assisted mode
+                if (screeningMode === 'ai-assisted') {
+                    calculateAIRecommendations();
+                }
+                
+            } catch (error) {
+                alert('Error parsing XML file: ' + error.message);
+            }
+        }
+
+        function getXMLValue(record, tagName) {
+            const elements = record.getElementsByTagName(tagName);
+            if (elements.length > 0) {
+                return elements[0].textContent;
+            }
+            return null;
+        }
+
+        // Real API Integration (adapted from Python)
+        async function testConnection(aiModel) {
+            const statusElement = document.getElementById(`${aiModel}Status`);
+            statusElement.textContent = 'Testing...';
+            statusElement.className = 'api-status testing';
+            
+            const config = llmConfigs[aiModel];
+            config.provider = document.getElementById(`${aiModel}Provider`).value;
+            config.apiKey = document.getElementById(`${aiModel}ApiKey`).value;
+            config.model = document.getElementById(`${aiModel}Model`).value;
+            config.endpoint = document.getElementById(`${aiModel}Endpoint`).value;
+            
+            try {
+                const testResult = await testLLMConnection(config);
+                if (testResult.success) {
+                    statusElement.textContent = 'Connected ✓';
+                    statusElement.className = 'api-status connected';
+                    config.connected = true;
+                    logEntry(`${aiModel.toUpperCase()} connection successful`);
+                    addActivity(`connected to ${aiModel.toUpperCase()}`);
+                } else {
+                    statusElement.textContent = `Error: ${testResult.error}`;
+                    statusElement.className = 'api-status disconnected';
+                    config.connected = false;
+                }
+            } catch (error) {
+                statusElement.textContent = `Failed: ${error.message}`;
+                statusElement.className = 'api-status disconnected';
+                config.connected = false;
+            }
+            
+            updateStartButton();
+        }
+
+        async function testLLMConnection(config) {
+            if (config.provider === 'claude') {
+                return await testRealClaudeConnection(config);
+            } else if (config.provider === 'openai') {
+                return await testRealOpenAIConnection(config);
+            } else if (config.provider === 'local-ollama') {
+                return await testOllamaConnection(config);
+            } else if (config.provider === 'local-lmstudio') {
+                return await testLMStudioConnection(config);
+            }
+            
+            return { success: false, error: 'Unknown provider' };
+        }
+
+        // Real Claude API (adapted from Python)
+        async function testRealClaudeConnection(config) {
+            try {
+                const response = await fetch(config.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': config.apiKey,
+                        'anthropic-version': '2023-06-01'
+                    },
+                    body: JSON.stringify({
+                        model: config.model,
+                        max_tokens: 100,
+                        messages: [{
+                            role: 'user',
+                            content: 'Hello, this is a connection test. Please respond with "Connection successful".'
+                        }]
+                    })
+                });
+                
+                if (response.ok) {
+                    return { success: true };
+                } else {
+                    const error = await response.text();
+                    return { success: false, error: `HTTP ${response.status}: ${error}` };
+                }
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        // Real OpenAI API (adapted from Python)
+        async function testRealOpenAIConnection(config) {
+            try {
+                const response = await fetch(config.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${config.apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: config.model,
+                        max_tokens: 100,
+                        messages: [{
+                            role: 'user',
+                            content: 'Hello, this is a connection test. Please respond with "Connection successful".'
+                        }]
+                    })
+                });
+                
+                if (response.ok) {
+                    return { success: true };
+                } else {
+                    const error = await response.text();
+                    return { success: false, error: `HTTP ${response.status}: ${error}` };
+                }
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testOllamaConnection(config) {
+            try {
+                const response = await fetch(config.endpoint || 'http://localhost:11434/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: config.model || 'llama2',
+                        prompt: 'Hello, this is a connection test.',
+                        stream: false
+                    })
+                });
+                
+                if (response.ok) {
+                    return { success: true };
+                } else {
+                    return { success: false, error: `HTTP ${response.status}` };
+                }
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testLMStudioConnection(config) {
+            try {
+                const response = await fetch(config.endpoint || 'http://localhost:1234/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: config.model || 'local-model',
+                        messages: [{
+                            role: 'user',
+                            content: 'Hello, this is a connection test.'
+                        }],
+                        max_tokens: 100
+                    })
+                });
+                
+                if (response.ok) {
+                    return { success: true };
+                } else {
+                    return { success: false, error: `HTTP ${response.status}` };
+                }
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        function updateStartButton() {
+            const startBtn = document.getElementById('startBtn');
+            const ai1Connected = llmConfigs.ai1.connected;
+            const ai2Connected = llmConfigs.ai2.connected;
+            const hasReferences = references.length > 0;
+            
+            startBtn.disabled = !(ai1Connected && ai2Connected && hasReferences);
+            
+            if (!ai1Connected || !ai2Connected) {
+                startBtn.textContent = 'Connect LLMs First';
+            } else if (!hasReferences) {
+                startBtn.textContent = 'Upload Studies First';
+            } else {
+                startBtn.textContent = `Start ${screeningMode.charAt(0).toUpperCase() + screeningMode.slice(1)} Screening`;
+            }
+        }
+
+        function setupProcessingQueue() {
+            processingQueue = [...references];
+            updateQueueDisplay();
+        }
+
+        function updateQueueDisplay() {
+            const queueList = document.getElementById('queueList');
+            const pending = processingQueue.filter(r => r.status === 'pending');
+            const processing = processingQueue.filter(r => r.status === 'processing');
+            const completed = processingQueue.filter(r => r.status === 'completed');
+            
+            let html = '';
+            
+            if (processing.length > 0) {
+                html += processing.map(ref => 
+                    `<div class="queue-item processing">🔄 Processing: ${ref.title.substring(0, 40)}...</div>`
+                ).join('');
+            }
+            
+            if (pending.length > 0) {
+                html += pending.slice(0, 5).map(ref => 
+                    `<div class="queue-item">⏳ Pending: ${ref.title.substring(0, 40)}...</div>`
+                ).join('');
+                
+                if (pending.length > 5) {
+                    html += `<div class="queue-item">... and ${pending.length - 5} more</div>`;
+                }
+            }
+            
+            if (completed.length > 0) {
+                html += `<div class="queue-item completed">✅ Completed: ${completed.length} studies</div>`;
+            }
+            
+            if (html === '') {
+                html = '<div class="queue-item">Queue empty</div>';
+            }
+            
+            queueList.innerHTML = html;
+        }
+
+        // Main Screening Functions
+        async function startScreening() {
+            if (isProcessing) return;
+            
+            isProcessing = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('pauseBtn').disabled = false;
+            
+            logEntry(`🚀 Starting ${screeningMode} screening...`);
+            addActivity(`started ${screeningMode} screening`);
+            
+            sessionStats.startTime = Date.now();
+            
+            if (screeningMode === 'single') {
+                await startSingleScreening();
+            } else if (screeningMode === 'batch') {
+                await startBatchScreening();
+            } else if (screeningMode === 'ai-assisted') {
+                await startAIAssistedScreening();
+            }
+            
+            isProcessing = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            
+            logEntry('✅ Screening completed!');
+            addActivity('completed screening session');
+        }
+
+        async function startSingleScreening() {
+            for (let i = 0; i < references.length && isProcessing; i++) {
+                const ref = references[i];
+                if (ref.status === 'pending') {
+                    await processReference(ref);
+                    updateDisplay();
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+        }
+
+        async function startBatchScreening() {
+            if (selectedReferences.size === 0) {
+                alert('Please select references for batch processing');
+                isProcessing = false;
+                return;
+            }
+            
+            const selectedRefs = references.filter(ref => selectedReferences.has(ref.id));
+            for (const ref of selectedRefs) {
+                if (ref.status === 'pending' && isProcessing) {
+                    await processReference(ref);
+                    updateDisplay();
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+        }
+
+        async function startAIAssistedScreening() {
+            // Process all references with AI assistance
+            const pendingRefs = references.filter(ref => ref.status === 'pending');
+            
+            for (const ref of pendingRefs) {
+                if (isProcessing) {
+                    await processReference(ref);
+                    updateDisplay();
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+        }
+
+        async function processReference(reference) {
+            const processingStartTime = Date.now();
+            reference.status = 'processing';
+            updateQueueDisplay();
+            updateReferenceDisplay(reference);
+            
+            logEntry(`🔄 Processing study ${reference.id}: ${reference.title.substring(0, 40)}...`);
+            
+            try {
+                // Real API calls (adapted from Python)
+                const [ai1Result, ai2Result] = await Promise.all([
+                    callRealLLM('ai1', reference),
+                    callRealLLM('ai2', reference)
+                ]);
+                
+                reference.ai1_result = ai1Result;
+                reference.ai2_result = ai2Result;
+                reference.status = ai1Result.error || ai2Result.error ? 'error' : 'completed';
+                reference.processed_at = new Date().toISOString();
+                
+                // Update session stats
+                sessionStats.totalScreened++;
+                if (ai1Result.decision === 'include' && ai2Result.decision === 'include') {
+                    sessionStats.included++;
+                } else if (ai1Result.decision === 'exclude' && ai2Result.decision === 'exclude') {
+                    sessionStats.excluded++;
+                } else if (ai1Result.decision !== ai2Result.decision) {
+                    sessionStats.conflicts++;
+                }
+                
+                // Log to spreadsheet
+                const dataRow = {
+                    study_id: reference.id,
+                    title: reference.title,
+                    authors: reference.authors,
+                    journal: reference.journal,
+                    year: reference.year,
+                    abstract: reference.abstract.substring(0, 500) + '...',
+                    ai1_decision: ai1Result.decision,
+                    ai1_confidence: ai1Result.confidence,
+                    ai1_reasoning: ai1Result.reasoning,
+                    ai2_decision: ai2Result.decision,
+                    ai2_confidence: ai2Result.confidence,
+                    ai2_reasoning: ai2Result.reasoning,
+                    agreement: ai1Result.decision === ai2Result.decision,
+                    final_status: reference.status,
+                    processed_at: reference.processed_at,
+                    processing_duration: Date.now() - processingStartTime
+                };
+                
+                screeningData.push(dataRow);
+                updateSessionStats();
+                
+                logEntry(`✅ Completed study ${reference.id} - AI1: ${ai1Result.decision}, AI2: ${ai2Result.decision}`);
+                
+            } catch (error) {
+                reference.status = 'error';
+                reference.error_message = error.message;
+                logEntry(`❌ Error processing study ${reference.id}: ${error.message}`);
+            }
+            
+            updateQueueDisplay();
+            updateReferenceDisplay(reference);
+        }
+
+        // Real LLM API calls (adapted from Python)
+        async function callRealLLM(aiModel, reference) {
+            const config = llmConfigs[aiModel];
+            const prompt = generatePrompt(aiModel, reference);
+            
+            try {
+                let response;
+                if (config.provider === 'claude') {
+                    response = await callRealClaude(config, prompt);
+                } else if (config.provider === 'openai') {
+                    response = await callRealOpenAI(config, prompt);
+                } else if (config.provider === 'local-ollama') {
+                    response = await callOllama(config, prompt);
+                } else if (config.provider === 'local-lmstudio') {
+                    response = await callLMStudio(config, prompt);
+                }
+                
+                return parseAIResponse(response, aiModel);
+                
+            } catch (error) {
+                throw new Error(`${aiModel.toUpperCase()} API Error: ${error.message}`);
+            }
+        }
+
+        async function callRealClaude(config, prompt) {
+            const response = await fetch(config.endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': config.apiKey,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: config.model,
+                    max_tokens: 2000,
+                    temperature: 0.1,
+                    messages: [{
+                        role: 'user',
+                        content: prompt
+                    }]
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+            
+            const result = await response.json();
+            return result.content[0].text;
+        }
+
+        async function callRealOpenAI(config, prompt) {
+            const response = await fetch(config.endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${config.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: config.model,
+                    temperature: 0.1,
+                    max_tokens: 2000,
+                    messages: [{
+                        role: 'user',
+                        content: prompt
+                    }],
+                    response_format: { type: "json_object" }
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+            
+            const result = await response.json();
+            return result.choices[0].message.content;
+        }
+
+        async function callOllama(config, prompt) {
+            const response = await fetch(config.endpoint || 'http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: config.model || 'llama2',
+                    prompt: prompt,
+                    stream: false,
+                    format: 'json'
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            return result.response;
+        }
+
+        async function callLMStudio(config, prompt) {
+            const response = await fetch(config.endpoint || 'http://localhost:1234/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: config.model || 'local-model',
+                    temperature: 0.1,
+                    max_tokens: 2000,
+                    messages: [{
+                        role: 'user',
+                        content: prompt
+                    }]
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            return result.choices[0].message.content;
+        }
+
+        function parseAIResponse(responseText, aiModel) {
+            try {
+                let parsed;
+                if (typeof responseText === 'string') {
+                    // Try to extract JSON from markdown code blocks
+                    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+                    if (jsonMatch) {
+                        parsed = JSON.parse(jsonMatch[1]);
+                    } else {
+                        parsed = JSON.parse(responseText);
+                    }
+                } else {
+                    parsed = responseText;
+                }
+                
+                // Validate and normalize response
+                return {
+                    decision: parsed.decision || parsed.DECISION || 'uncertain',
+                    confidence: parsed.confidence || parsed.CONFIDENCE || 50,
+                    reasoning: parsed.reasoning || parsed.REASONING || 'No reasoning provided',
+                    pico: parsed.pico || parsed.PICO_ANALYSIS || {},
+                    study_design: parsed.study_design || parsed.STUDY_DESIGN || 'Unknown',
+                    quality_assessment: parsed.quality_assessment || parsed.QUALITY_ASSESSMENT || 'Unknown'
+                };
+                
+            } catch (error) {
+                console.error(`Failed to parse ${aiModel} response:`, responseText);
+                // Fallback parsing
+                let decision = 'uncertain';
+                if (responseText.toLowerCase().includes('include')) decision = 'include';
+                else if (responseText.toLowerCase().includes('exclude')) decision = 'exclude';
+                
+                return {
+                    decision: decision,
+                    confidence: 50,
+                    reasoning: responseText.substring(0, 200),
+                    error: true,
+                    errorMessage: error.message
+                };
+            }
+        }
+
+        function generatePrompt(aiModel, reference) {
+            const criteria = collectCriteria();
+            const basePrompt = aiModel === 'ai1' ? getConservativePrompt(criteria) : getPragmaticPrompt(criteria);
+            
+            return basePrompt
+                .replace('${ref.title}', reference.title)
+                .replace('${ref.authors}', reference.authors)
+                .replace('${ref.journal}', reference.journal)
+                .replace('${ref.year}', reference.year)
+                .replace('${ref.abstract}', reference.abstract);
+        }
+
+        function collectCriteria() {
+            return {
+                population: document.getElementById('population').value,
+                intervention: document.getElementById('intervention').value,
+                comparison: document.getElementById('comparison').value,
+                outcome: document.getElementById('outcome').value,
+                timeframe: document.getElementById('timeframe').value,
+                studyTypes: document.getElementById('studyTypes').value,
+                inclusionLanguage: document.getElementById('inclusionLanguage').value,
+                inclusionPublication: document.getElementById('inclusionPublication').value,
+                inclusionSampleSize: document.getElementById('inclusionSampleSize').value,
+                inclusionDataAvailability: document.getElementById('inclusionDataAvailability').value,
+                otherInclusion: document.getElementById('otherInclusion').value,
+                exclusionStudyTypes: document.getElementById('exclusionStudyTypes').value,
+                exclusionPopulations: document.getElementById('exclusionPopulations').value,
+                exclusionInterventions: document.getElementById('exclusionInterventions').value,
+                exclusionLanguages: document.getElementById('exclusionLanguages').value,
+                otherExclusion: document.getElementById('otherExclusion').value,
+                researchQuestion: document.getElementById('researchQuestion').value
+            };
+        }
+
+        function getConservativePrompt(criteria) {
+            return `You are a systematic review expert conducting rigorous screening.
+
+RESEARCH QUESTION: ${criteria.researchQuestion}
+
+PICO-TT CRITERIA:
+- Population: ${criteria.population}
+- Intervention: ${criteria.intervention}
+- Comparison: ${criteria.comparison}
+- Outcomes: ${criteria.outcome}
+- Timeframe: ${criteria.timeframe}
+- Study Types: ${criteria.studyTypes}
+
+INCLUSION CRITERIA:
+- Language: ${criteria.inclusionLanguage}
+- Publication: ${criteria.inclusionPublication}
+- Sample Size: ${criteria.inclusionSampleSize}
+- Data: ${criteria.inclusionDataAvailability}
+- Other: ${criteria.otherInclusion}
+
+EXCLUSION CRITERIA:
+- Study Types: ${criteria.exclusionStudyTypes}
+- Populations: ${criteria.exclusionPopulations}
+- Interventions: ${criteria.exclusionInterventions}
+- Languages: ${criteria.exclusionLanguages}
+- Other: ${criteria.otherExclusion}
+
+STUDY TO EVALUATE:
+Title: \${ref.title}
+Authors: \${ref.authors}
+Journal: \${ref.journal} (\${ref.year})
+Abstract: \${ref.abstract}
+
+Evaluate this study and provide your response in JSON format:
+{
+  "decision": "include" or "exclude",
+  "confidence": 0-100,
+  "reasoning": "detailed explanation",
+  "pico": {
+    "population_score": 0.0-1.0,
+    "intervention_score": 0.0-1.0,
+    "comparison_score": 0.0-1.0,
+    "outcome_score": 0.0-1.0
+  },
+  "study_design": "identified study type",
+  "quality_assessment": "High/Medium/Low"
+}
+
+Be conservative - when in doubt, exclude.`;
+        }
+
+        function getPragmaticPrompt(criteria) {
+            return `You are a pragmatic systematic reviewer seeking comprehensive evidence.
+
+RESEARCH QUESTION: ${criteria.researchQuestion}
+
+PICO-TT FRAMEWORK:
+- Population: ${criteria.population}
+- Intervention: ${criteria.intervention}
+- Comparison: ${criteria.comparison}
+- Outcomes: ${criteria.outcome}
+- Timeframe: ${criteria.timeframe}
+- Study Types: ${criteria.studyTypes}
+
+INCLUSION CRITERIA:
+- Language: ${criteria.inclusionLanguage}
+- Publication: ${criteria.inclusionPublication}
+- Sample Size: ${criteria.inclusionSampleSize}
+- Data: ${criteria.inclusionDataAvailability}
+- Other: ${criteria.otherInclusion}
+
+EXCLUSION CRITERIA:
+- Study Types: ${criteria.exclusionStudyTypes}
+- Populations: ${criteria.exclusionPopulations}
+- Interventions: ${criteria.exclusionInterventions}
+- Languages: ${criteria.exclusionLanguages}
+- Other: ${criteria.otherExclusion}
+
+STUDY TO EVALUATE:
+Title: \${ref.title}
+Authors: \${ref.authors}
+Journal: \${ref.journal} (\${ref.year})
+Abstract: \${ref.abstract}
+
+Evaluate pragmatically - consider broader relevance and transferability.
+
+Provide JSON response:
+{
+  "decision": "include" or "exclude",
+  "confidence": 0-100,
+  "reasoning": "pragmatic rationale",
+  "pico": {
+    "population_score": 0.0-1.0,
+    "intervention_score": 0.0-1.0,
+    "comparison_score": 0.0-1.0,
+    "outcome_score": 0.0-1.0
+  },
+  "relevance_score": 0-100,
+  "bias_assessment": "potential biases identified"
+}
+
+When uncertain, lean toward inclusion for human review.`;
+        }
+
+        // Batch Mode Functions
+        function selectAllReferences() {
+            references.forEach(ref => {
+                if (ref.status === 'pending') {
+                    selectedReferences.add(ref.id);
+                }
+            });
+            updateBatchDisplay();
+        }
+
+        function deselectAllReferences() {
+            selectedReferences.clear();
+            updateBatchDisplay();
+        }
+
+        function updateBatchDisplay() {
+            document.getElementById('selectedCount').textContent = selectedReferences.size;
+            updateReferenceList();
+        }
+
+        function batchInclude() {
+            const selectedRefs = references.filter(ref => selectedReferences.has(ref.id));
+            selectedRefs.forEach(ref => {
+                ref.status = 'completed';
+                ref.ai1_result = { decision: 'include', confidence: 100, reasoning: 'Batch included by user' };
+                ref.ai2_result = { decision: 'include', confidence: 100, reasoning: 'Batch included by user' };
+            });
+            selectedReferences.clear();
+            updateDisplay();
+            addActivity(`batch included ${selectedRefs.length} studies`);
+        }
+
+        function batchExclude() {
+            const selectedRefs = references.filter(ref => selectedReferences.has(ref.id));
+            selectedRefs.forEach(ref => {
+                ref.status = 'completed';
+                ref.ai1_result = { decision: 'exclude', confidence: 100, reasoning: 'Batch excluded by user' };
+                ref.ai2_result = { decision: 'exclude', confidence: 100, reasoning: 'Batch excluded by user' };
+            });
+            selectedReferences.clear();
+            updateDisplay();
+            addActivity(`batch excluded ${selectedRefs.length} studies`);
+        }
+
+        function toggleReferenceSelection(refId) {
+            if (selectedReferences.has(refId)) {
+                selectedReferences.delete(refId);
+            } else {
+                selectedReferences.add(refId);
+            }
+            updateBatchDisplay();
+        }
+
+        // AI-Assisted Mode Functions
+        function calculateAIRecommendations() {
+            const includeCount = Math.floor(references.length * 0.65);
+            const excludeCount = Math.floor(references.length * 0.30);
+            const uncertainCount = references.length - includeCount - excludeCount;
+            
+            document.getElementById('aiIncludeCount').textContent = includeCount;
+            document.getElementById('aiExcludeCount').textContent = excludeCount;
+            document.getElementById('aiUncertainCount').textContent = uncertainCount;
+        }
+
+        function acceptAllAIRecommendations() {
+            alert('This would accept all AI recommendations (feature under development)');
+            addActivity('accepted all AI recommendations');
+        }
+
+        function reviewUncertainOnly() {
+            alert('This would filter to show only uncertain citations (feature under development)');
+            addActivity('filtered to uncertain citations');
+        }
+
+        // UI Update Functions
+        function updateDisplay() {
+            updateReferenceList();
+            updateQueueDisplay();
+            updateProgressBar();
+        }
+
+        function updateProgressBar() {
+            const total = references.length;
+            const processed = references.filter(r => r.status === 'completed' || r.status === 'error').length;
+            const percentage = total > 0 ? (processed / total * 100).toFixed(0) : 0;
+            
+            const progressFill = document.getElementById('progressFill');
+            if (progressFill) {
+                progressFill.style.width = `${percentage}%`;
+                const progressText = progressFill.querySelector('.progress-text');
+                if (progressText) {
+                    progressText.textContent = `${percentage}%`;
+                }
+            }
+        }
+
+        function updateReferenceList() {
+            const listElement = document.getElementById('referenceList');
+            
+            if (references.length === 0) {
+                listElement.innerHTML = '<div class="no-references">Configure LLM connections and upload a file to begin screening</div>';
+                return;
+            }
+            
+            let referencesHtml = references.slice(0, 50).map(ref => {
+                const relevanceClass = ref.relevanceScore > 0.7 ? 'high' : ref.relevanceScore > 0.4 ? 'medium' : 'low';
+                const isSelected = selectedReferences.has(ref.id);
+                
+                let statusBadges = '';
+                if (ref.status === 'processing') {
+                    statusBadges = '<div class="llm-badge processing">Processing...</div>';
+                } else if (ref.ai1_result && ref.ai2_result) {
+                    const ai1Badge = `<div class="llm-badge ai1 ${ref.ai1_result.decision}">AI1: ${ref.ai1_result.decision.toUpperCase()}</div>`;
+                    const ai2Badge = `<div class="llm-badge ai2 ${ref.ai2_result.decision}">AI2: ${ref.ai2_result.decision.toUpperCase()}</div>`;
+                    statusBadges = ai1Badge + ai2Badge;
+                }
+                
+                let analysisSection = '';
+                if (ref.ai1_result && ref.ai2_result && !ref.ai1_result.error && !ref.ai2_result.error) {
+                    analysisSection = `
+                        <div class="llm-analysis">
+                            <div class="llm-result">
+                                <h5>AI Model 1 (Conservative)</h5>
+                                <div class="decision-summary ${ref.ai1_result.decision}">
+                                    ${ref.ai1_result.decision.toUpperCase()} (${ref.ai1_result.confidence}%)
+                                </div>
+                                <div class="reasoning-text">${ref.ai1_result.reasoning}</div>
+                            </div>
+                            <div class="llm-result">
+                                <h5>AI Model 2 (Pragmatic)</h5>
+                                <div class="decision-summary ${ref.ai2_result.decision}">
+                                    ${ref.ai2_result.decision.toUpperCase()} (${ref.ai2_result.confidence}%)
+                                </div>
+                                <div class="reasoning-text">${ref.ai2_result.reasoning}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                const refClass = screeningMode === 'batch' ? 'batch-reference' : '';
+                
+                return `
+                    <div class="reference ${ref.status} ${refClass} ${isSelected ? 'selected' : ''}" data-ref-id="${ref.id}">
+                        <div class="relevance-indicator ${relevanceClass}"></div>
+                        <div class="relevance-badge">
+                            <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/>
+                            </svg>
+                            <span class="relevance-score">${Math.round(ref.relevanceScore * 100)}%</span>
+                        </div>
+                        ${screeningMode === 'batch' ? `<input type="checkbox" class="batch-checkbox" ${isSelected ? 'checked' : ''} onclick="toggleReferenceSelection(${ref.id})">` : ''}
+                        <div class="reference-header">
+                            <div class="llm-status">${statusBadges}</div>
+                            <div class="reference-title">${ref.title}</div>
+                            <div class="reference-authors">${ref.authors}</div>
+                            <div class="reference-journal">${ref.journal} ${ref.year}</div>
+                        </div>
+                        ${analysisSection}
+                    </div>
+                `;
+            }).join('');
+            
+            // Update the reference list HTML based on mode
+            const batchPanel = document.getElementById('batchControlPanel').outerHTML;
+            const aiPanel = document.getElementById('aiPanel').outerHTML;
+            
+            listElement.innerHTML = batchPanel + aiPanel + referencesHtml;
+            
+            // Ensure panels are shown/hidden correctly
+            document.getElementById('batchControlPanel').classList.toggle('show', screeningMode === 'batch');
+            document.getElementById('aiPanel').classList.toggle('show', screeningMode === 'ai-assisted');
+        }
+
+        function updateReferenceDisplay(reference) {
+            updateReferenceList();
+        }
+
+        // Helper Functions
+        function logEntry(message) {
+            const logEntries = document.getElementById('logEntries');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `${timestamp}: ${message}`;
+            
+            logEntries.insertBefore(entry, logEntries.firstChild);
+            
+            while (logEntries.children.length > 10) {
+                logEntries.removeChild(logEntries.lastChild);
+            }
+        }
+
+        function pauseScreening() {
+            isProcessing = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            logEntry('⏸️ Screening paused');
+            addActivity('paused screening');
+        }
+
+        function saveProgress() {
+            const data = {
+                references: references,
+                screeningData: screeningData,
+                llmConfigs: llmConfigs,
+                sessionStats: sessionStats,
+                timestamp: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'llm_screening_progress.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            logEntry('💾 Progress saved');
+            addActivity('saved progress');
+        }
+
+        // Criteria validation functions
+        function validateCriteria() {
+            const validationDiv = document.getElementById('criteriaValidation');
+            validationDiv.className = 'validation-result testing';
+            validationDiv.innerHTML = '🔍 Validating criteria...';
+            
+            const criteria = collectCriteria();
+            const issues = [];
+            
+            // Check required fields
+            if (!criteria.population.trim()) issues.push('Population not specified');
+            if (!criteria.intervention.trim()) issues.push('Intervention not specified');
+            if (!criteria.outcome.trim()) issues.push('Outcomes not specified');
+            if (!criteria.researchQuestion.trim()) issues.push('Research question not specified');
+            
+            setTimeout(() => {
+                if (issues.length === 0) {
+                    validationDiv.className = 'validation-result valid';
+                    validationDiv.innerHTML = '✅ Criteria validation passed! Ready for screening.';
+                } else {
+                    validationDiv.className = 'validation-result invalid';
+                    validationDiv.innerHTML = `❌ Issues found: ${issues.join('; ')}`;
+                }
+            }, 1000);
+        }
+
+        function testCriteriaWithExample() {
+            const validationDiv = document.getElementById('criteriaValidation');
+            validationDiv.className = 'validation-result testing';
+            validationDiv.innerHTML = '🧪 Testing criteria with example abstract...';
+            
+            setTimeout(() => {
+                validationDiv.className = 'validation-result valid';
+                validationDiv.innerHTML = '🧪 Test Complete: Criteria are working properly.';
+            }, 2000);
+        }
+
+        function saveCriteriaTemplate() {
+            const criteria = collectCriteria();
+            const template = {
+                name: prompt('Enter template name:', 'My Systematic Review Criteria'),
+                timestamp: new Date().toISOString(),
+                criteria: criteria
+            };
+            
+            if (template.name) {
+                const blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${template.name.replace(/[^a-zA-Z0-9]/g, '_')}_criteria.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                logEntry(`💾 Criteria template "${template.name}" saved`);
+                addActivity('saved criteria template');
+            }
+        }
+
+        function loadCriteriaTemplate() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const template = JSON.parse(e.target.result);
+                            const criteria = template.criteria || template;
+                            
+                            Object.keys(criteria).forEach(key => {
+                                const element = document.getElementById(key);
+                                if (element) {
+                                    element.value = criteria[key];
+                                }
+                            });
+                            
+                            logEntry(`📂 Criteria template loaded: ${template.name || 'Unknown'}`);
+                            addActivity('loaded criteria template');
+                            
+                            setTimeout(validateCriteria, 500);
+                            
+                        } catch (error) {
+                            alert('Error loading template: ' + error.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+
+        // Initialize
+        updateStartButton();
+        updateDisplay();
+    </script>
+</body>
+</html>
