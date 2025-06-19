@@ -3378,7 +3378,7 @@ HTML_CONTENT = """
         function highlightSearchTerms(text, searchTerm) {
             if (!text || !searchTerm) return text;
             
-            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&')})`, 'gi');
             return text.replace(regex, '<span class="search-highlight">$1</span>');
         }
 
