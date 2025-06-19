@@ -20,7 +20,7 @@ import re
 from datetime import datetime
 from typing import List, Dict, Optional, Any, Literal, Union
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -32,9 +32,9 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.pydantic_v1 import BaseModel as LangChainBaseModel, Field
+from pydantic import BaseModel as PydanticBaseModel
 
-# --- 1. Configuration & Initialization ---
+# --- Configuration & Initialization ---
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/ottosr")
 
@@ -44,19 +44,19 @@ Base = declarative_base()
 
 app = FastAPI(
     title="Otto-SR Production Tool v3.0",
-    description="Advanced systematic review screening with multiple LLM providers and real-time collaboration",
+    description="Advanced systematic review screening with multiple LLM providers",
     version="3.0.0"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True, 
-    allow_methods=["*"], 
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- 2. Enhanced Database Models ---
+# --- Database Models ---
 
 class Project(Base):
     __tablename__ = "projects"
@@ -87,8 +87,8 @@ class ScreeningResult(Base):
     project_id = Column(PG_UUID(as_uuid=True), nullable=False, index=True)
     job_id = Column(String, index=True)
     status = Column(String, default="pending")
-    ai1_result = Column(JSON)  # Conservative AI result
-    ai2_result = Column(JSON)  # Pragmatic AI result
+    ai1_result = Column(JSON)
+    ai2_result = Column(JSON)
     final_decision = Column(String)
     confidence_score = Column(Float)
     human_decision = Column(String, nullable=True)
@@ -105,7 +105,10 @@ class ActivityLog(Base):
     details = Column(JSON)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
+# Create tables
 Base.metadata.create_all(bind=engine)
+
+# --- Database Dependency ---
 
 def get_db():
     db = SessionLocal()
@@ -114,7 +117,7 @@ def get_db():
     finally:
         db.close()
 
-# --- 3. Enhanced Pydantic Models ---
+# --- Pydantic Models ---
 
 class AdvancedScreeningCriteria(BaseModel):
     population: str = ""
@@ -135,8 +138,6 @@ class AdvancedScreeningCriteria(BaseModel):
     otherExclusion: str = ""
     researchQuestion: str = ""
 
-# --- Enhanced LLM Provider Support ---
-
 class ProviderConfig(BaseModel):
     name: str
     display_name: str
@@ -145,86 +146,6 @@ class ProviderConfig(BaseModel):
     requires_api_key: bool
     default_endpoint: Optional[str] = None
     supports_streaming: bool = True
-
-# LLM Provider Configurations - Trusted and Tested Providers
-LLM_PROVIDERS = {
-    # Tier 1: Most Reliable for Production Screening
-    "openai": ProviderConfig(
-        name="openai",
-        display_name="OpenAI (Recommended)",
-        models=["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
-        default_model="gpt-4o",
-        requires_api_key=True,
-        supports_streaming=True
-    ),
-    "anthropic": ProviderConfig(
-        name="anthropic",
-        display_name="Anthropic Claude (Recommended)",
-        models=["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
-        default_model="claude-3-5-sonnet-20241022",
-        requires_api_key=True,
-        supports_streaming=True
-    ),
-    
-    # Tier 2: Local/Self-Hosted Options
-    "ollama": ProviderConfig(
-        name="ollama",
-        display_name="Ollama (Local)",
-        models=["llama3.1:8b", "llama3.1:70b", "llama3:70b", "mistral:7b", "phi3:medium", "qwen2.5:7b"],
-        default_model="llama3.1:8b",
-        requires_api_key=False,
-        default_endpoint="http://localhost:11434",
-        supports_streaming=True
-    ),
-    "openai_compatible": ProviderConfig(
-        name="openai_compatible",
-        display_name="OpenAI-Compatible (Local/Custom)",
-        models=["llama-3.1-8b-instruct", "llama-3.1-70b-instruct", "mistral-7b-instruct", "qwen2.5-7b-instruct"],
-        default_model="llama-3.1-8b-instruct",
-        requires_api_key=False,
-        default_endpoint="http://localhost:1234/v1",
-        supports_streaming=True
-    ),
-    
-    # Tier 3: Alternative Commercial Providers
-    "cohere": ProviderConfig(
-        name="cohere",
-        display_name="Cohere",
-        models=["command-r-plus", "command-r", "command-nightly"],
-        default_model="command-r-plus",
-        requires_api_key=True,
-        supports_streaming=True
-    ),
-    "groq": ProviderConfig(
-        name="groq",
-        display_name="Groq (Fast Inference)",
-        models=["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
-        default_model="llama-3.1-70b-versatile",
-        requires_api_key=True,
-        default_endpoint="https://api.groq.com/openai/v1",
-        supports_streaming=True
-    ),
-    "together": ProviderConfig(
-        name="together",
-        display_name="Together AI",
-        models=["meta-llama/Llama-3-8b-chat-hf", "meta-llama/Llama-3-70b-chat-hf", "mistralai/Mixtral-8x7B-Instruct-v0.1"],
-        default_model="meta-llama/Llama-3-70b-chat-hf",
-        requires_api_key=True,
-        default_endpoint="https://api.together.xyz/v1",
-        supports_streaming=True
-    ),
-    
-    # Provider Agnostic Option
-    "custom": ProviderConfig(
-        name="custom",
-        display_name="Custom Provider (Advanced)",
-        models=["custom-model-1", "custom-model-2", "custom-model-3"],
-        default_model="custom-model-1",
-        requires_api_key=True,
-        default_endpoint="https://your-api-endpoint.com/v1",
-        supports_streaming=True
-    )
-}
 
 class LLMConfig(BaseModel):
     provider: str
@@ -239,8 +160,7 @@ class LLMConfig(BaseModel):
     success_rate: float = 1.0
     specialization: List[str] = []
 
-# Structured Output Schema with Pydantic
-class ScreeningDecision(LangChainBaseModel):
+class ScreeningDecision(PydanticBaseModel):
     """Enhanced structured screening decision output"""
     decision: Literal["include", "exclude", "uncertain"] = Field(
         description="Final decision: 'include' to include the study, 'exclude' to exclude it, 'uncertain' for review"
@@ -305,208 +225,133 @@ class CitationUploadResponse(BaseModel):
     citations: Optional[List[Dict[str, Any]]] = None
     status: str = "success"
 
-# --- 4. Advanced File Parsing ---
+# --- Utility Functions ---
 
 def parse_ris_file(content: str) -> List[Dict[str, Any]]:
     """Robust RIS parser with comprehensive field extraction"""
     citations = []
+    current_citation = {}
     
-    # Split into individual records using ER delimiter
-    records = re.split(r'\nER\s*-\s*\n', content)
-    
-    for record in records:
-        record = record.strip()
-        if not record or record.startswith('ER'):
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line:
             continue
-        
-        fields = {}
-        lines = record.split('\n')
-        current_field = None
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
             
-            # Check if line starts with RIS field code (XX  - content)
-            if re.match(r'^[A-Z0-9]{2}\s*-', line):
-                parts = line.split('-', 1)
-                if len(parts) == 2:
-                    field_code = parts[0].strip()
-                    field_value = parts[1].strip()
-                    current_field = field_code
-                    
-                    # Handle multiple values for same field
-                    if field_code in fields:
-                        if isinstance(fields[field_code], list):
-                            fields[field_code].append(field_value)
-                        else:
-                            fields[field_code] = [fields[field_code], field_value]
-                    else:
-                        fields[field_code] = field_value
-            elif current_field and line:
-                # Continuation of previous field
-                if isinstance(fields[current_field], list):
-                    fields[current_field][-1] += ' ' + line
+        if line.startswith('ER  -'):
+            if current_citation:
+                # Calculate relevance score based on completeness
+                score = 0.3  # base score
+                if current_citation.get('title'): score += 0.3
+                if current_citation.get('abstract'): score += 0.2
+                if current_citation.get('authors'): score += 0.1
+                if current_citation.get('year'): score += 0.1
+                current_citation['relevance_score'] = min(score, 1.0)
+                
+                citations.append(current_citation)
+                current_citation = {}
+            continue
+            
+        if '  - ' in line:
+            field, value = line.split('  - ', 1)
+            
+            if field == 'TI':
+                current_citation['title'] = value
+            elif field == 'AU':
+                if 'authors' not in current_citation:
+                    current_citation['authors'] = value
                 else:
-                    fields[current_field] += ' ' + line
-        
-        # Convert to citation format
-        citation = {}
-        
-        # Extract title
-        title = fields.get('TI', '').strip()
-        citation['title'] = title if title else "No title available"
-        
-        # Extract abstract (try AB first, then N2 as fallback)
-        abstract = fields.get('AB', fields.get('N2', '')).strip()
-        citation['abstract'] = abstract if abstract else "No abstract available"
-        
-        # Extract authors
-        authors = []
-        author_field = fields.get('AU', [])
-        if isinstance(author_field, str):
-            authors = [author_field]
-        elif isinstance(author_field, list):
-            authors = author_field
-        
-        # Clean and format author names
-        cleaned_authors = []
-        for author in authors:
-            if author.strip():
-                # Clean author name: normalize whitespace and handle commas
-                author = re.sub(r'\s+', ' ', author.strip())
-                author = re.sub(r'\s*,\s*', ', ', author)
-                cleaned_authors.append(author)
-        
-        citation['authors'] = '; '.join(cleaned_authors) if cleaned_authors else "Unknown"
-        
-        # Extract journal (try JO first, then JF as fallback)
-        journal = fields.get('JO', fields.get('JF', '')).strip()
-        citation['journal'] = journal if journal else "Unknown journal"
-        
-        # Extract year from multiple possible fields
-        year = None
-        year_fields = ['PY', 'DA', 'Y1']
-        for field in year_fields:
-            if field in fields:
-                year_str = str(fields[field])
-                # Extract 4-digit year using regex
-                year_match = re.search(r'(\d{4})', year_str)
-                if year_match:
-                    year = int(year_match.group(1))
-                    # Validate reasonable year range
-                    if 1900 <= year <= 2030:
-                        break
-        citation['year'] = year if year else 2000
-        
-        # Extract DOI
-        doi = fields.get('DO', '').strip()
-        # Validate DOI format (should start with 10.)
-        if doi and not doi.startswith('10.'):
-            doi = None
-        citation['doi'] = doi
-        
-        # Extract keywords
-        keywords = []
-        keyword_field = fields.get('KW', [])
-        if isinstance(keyword_field, str):
-            keywords = [keyword_field]
-        elif isinstance(keyword_field, list):
-            keywords = keyword_field
-        
-        # Clean keywords and join with semicolons
-        cleaned_keywords = [kw.strip() for kw in keywords if kw.strip()]
-        citation['keywords'] = '; '.join(cleaned_keywords) if cleaned_keywords else None
-        
-        # Calculate relevance score based on content completeness
-        score = 0.2  # Base score
-        if citation.get('title') and citation['title'] != "No title available":
-            score += 0.3
-        if citation.get('abstract') and citation['abstract'] != "No abstract available":
-            score += 0.3
-        if citation.get('authors') and citation['authors'] != "Unknown":
-            score += 0.1
-        if citation.get('year') and citation['year'] != 2000:
-            score += 0.05
-        if citation.get('doi'):
-            score += 0.05
-        
-        citation['relevance_score'] = min(score, 1.0)
-        
-        citations.append(citation)
+                    current_citation['authors'] += '; ' + value
+            elif field == 'JO' or field == 'T2':
+                current_citation['journal'] = value
+            elif field == 'PY':
+                try:
+                    current_citation['year'] = int(value[:4])
+                except:
+                    current_citation['year'] = None
+            elif field == 'AB':
+                current_citation['abstract'] = value
+            elif field == 'DO':
+                current_citation['doi'] = value
+            elif field == 'KW':
+                if 'keywords' not in current_citation:
+                    current_citation['keywords'] = value
+                else:
+                    current_citation['keywords'] += '; ' + value
     
     return citations
-
-# --- 6. Advanced Performance Analytics ---
 
 class PerformanceTracker:
     """Track LLM performance metrics for optimization"""
     
     def __init__(self):
-        self.metrics = {}
-        self.session_start = datetime.utcnow()
+        self.metrics = {
+            'responses': [],
+            'providers': {},
+            'session_start': datetime.utcnow()
+        }
     
     def record_response(self, provider: str, model: str, response_time: float, 
                        tokens: int, success: bool, confidence: float = 0.0):
         """Record LLM response metrics"""
-        key = f"{provider}:{model}"
+        record = {
+            'provider': provider,
+            'model': model,
+            'response_time': response_time,
+            'tokens': tokens,
+            'success': success,
+            'confidence': confidence,
+            'timestamp': datetime.utcnow()
+        }
         
-        if key not in self.metrics:
-            self.metrics[key] = {
-                "total_requests": 0,
-                "successful_requests": 0,
-                "total_response_time": 0.0,
-                "total_tokens": 0,
-                "total_confidence": 0.0,
-                "error_count": 0,
-                "first_seen": datetime.utcnow(),
-                "last_used": datetime.utcnow()
+        self.metrics['responses'].append(record)
+        
+        if provider not in self.metrics['providers']:
+            self.metrics['providers'][provider] = {
+                'total_calls': 0,
+                'successful_calls': 0,
+                'total_time': 0.0,
+                'total_tokens': 0,
+                'avg_confidence': 0.0
             }
         
-        stats = self.metrics[key]
-        stats["total_requests"] += 1
-        stats["total_response_time"] += response_time
-        stats["total_tokens"] += tokens
-        stats["last_used"] = datetime.utcnow()
+        provider_metrics = self.metrics['providers'][provider]
+        provider_metrics['total_calls'] += 1
+        provider_metrics['total_time'] += response_time
+        provider_metrics['total_tokens'] += tokens
         
         if success:
-            stats["successful_requests"] += 1
-            stats["total_confidence"] += confidence
-        else:
-            stats["error_count"] += 1
+            provider_metrics['successful_calls'] += 1
+            
+        # Update rolling average confidence
+        if confidence > 0:
+            current_avg = provider_metrics['avg_confidence']
+            total_successful = provider_metrics['successful_calls']
+            provider_metrics['avg_confidence'] = (
+                (current_avg * (total_successful - 1) + confidence) / total_successful
+                if total_successful > 0 else confidence
+            )
     
     def get_analytics(self) -> Dict[str, Any]:
         """Generate comprehensive performance analytics"""
+        total_responses = len(self.metrics['responses'])
+        successful_responses = sum(1 for r in self.metrics['responses'] if r['success'])
+        
         analytics = {
-            "session_duration": (datetime.utcnow() - self.session_start).total_seconds(),
-            "models": {},
-            "recommendations": []
+            'session_duration': (datetime.utcnow() - self.metrics['session_start']).total_seconds(),
+            'total_responses': total_responses,
+            'success_rate': successful_responses / total_responses if total_responses > 0 else 0,
+            'avg_response_time': sum(r['response_time'] for r in self.metrics['responses']) / total_responses if total_responses > 0 else 0,
+            'providers': {}
         }
         
-        for key, stats in self.metrics.items():
-            if stats["total_requests"] > 0:
-                provider, model = key.split(":", 1)
-                avg_response_time = stats["total_response_time"] / stats["total_requests"]
-                success_rate = stats["successful_requests"] / stats["total_requests"]
-                avg_confidence = stats["total_confidence"] / max(stats["successful_requests"], 1)
-                
-                analytics["models"][key] = {
-                    "provider": provider,
-                    "model": model,
-                    "requests": stats["total_requests"],
-                    "success_rate": round(success_rate * 100, 1),
-                    "avg_response_time": round(avg_response_time, 2),
-                    "avg_confidence": round(avg_confidence, 2),
-                    "total_tokens": stats["total_tokens"],
-                    "errors": stats["error_count"]
-                }
-                
-                # Generate recommendations
-                if success_rate < 0.8:
-                    analytics["recommendations"].append(f"Low success rate for {key} ({success_rate*100:.1f}%)")
-                if avg_response_time > 10:
-                    analytics["recommendations"].append(f"Slow response time for {key} ({avg_response_time:.1f}s)")
+        for provider, metrics in self.metrics['providers'].items():
+            analytics['providers'][provider] = {
+                'success_rate': metrics['successful_calls'] / metrics['total_calls'] if metrics['total_calls'] > 0 else 0,
+                'avg_response_time': metrics['total_time'] / metrics['total_calls'] if metrics['total_calls'] > 0 else 0,
+                'avg_confidence': metrics['avg_confidence'],
+                'total_calls': metrics['total_calls'],
+                'total_tokens': metrics['total_tokens']
+            }
         
         return analytics
 
@@ -516,226 +361,207 @@ class ConflictResolver:
     @staticmethod
     def calculate_agreement_score(result1: Dict, result2: Dict) -> float:
         """Calculate sophisticated agreement score between two LLM results"""
-        if not result1 or not result2:
-            return 0.0
+        agreement_factors = []
         
         # Decision agreement (most important)
-        decision1 = result1.get("decision", "").lower()
-        decision2 = result2.get("decision", "").lower()
-        decision_match = 0.4 if decision1 == decision2 else 0.0
+        if result1.get('decision') == result2.get('decision'):
+            agreement_factors.append(0.4)  # 40% weight
         
         # Confidence alignment
-        conf1 = result1.get("confidence", 0) / 100.0
-        conf2 = result2.get("confidence", 0) / 100.0
-        conf_diff = abs(conf1 - conf2)
-        confidence_score = 0.3 * (1.0 - conf_diff)
+        conf1 = result1.get('confidence', 0)
+        conf2 = result2.get('confidence', 0)
+        conf_diff = abs(conf1 - conf2) / 100.0
+        agreement_factors.append((1 - conf_diff) * 0.2)  # 20% weight
         
         # PICO scores alignment
-        pico1 = result1.get("pico_scores", {})
-        pico2 = result2.get("pico_scores", {})
-        pico_agreement = 0.0
-        if pico1 and pico2:
-            pico_diffs = [abs(pico1.get(k, 0.5) - pico2.get(k, 0.5)) for k in ["population", "intervention", "comparison", "outcome"]]
-            pico_agreement = 0.2 * (1.0 - sum(pico_diffs) / len(pico_diffs))
+        pico1 = result1.get('pico_scores', {})
+        pico2 = result2.get('pico_scores', {})
+        pico_agreement = 0
+        pico_count = 0
         
-        # Quality assessment alignment
-        quality1 = result1.get("quality_assessment", "").lower()
-        quality2 = result2.get("quality_assessment", "").lower()
-        quality_score = 0.1 if quality1 == quality2 else 0.0
+        for component in ['population', 'intervention', 'comparison', 'outcome']:
+            if component in pico1 and component in pico2:
+                pico_agreement += 1 - abs(pico1[component] - pico2[component])
+                pico_count += 1
         
-        return min(1.0, decision_match + confidence_score + pico_agreement + quality_score)
+        if pico_count > 0:
+            agreement_factors.append((pico_agreement / pico_count) * 0.2)  # 20% weight
+        
+        # Quality assessment agreement
+        if result1.get('quality_assessment') == result2.get('quality_assessment'):
+            agreement_factors.append(0.2)  # 20% weight
+        
+        return sum(agreement_factors)
     
     @staticmethod
     def resolve_conflict(ai1_result: Dict, ai2_result: Dict, citation: Dict) -> Dict[str, Any]:
         """Intelligent conflict resolution"""
         agreement_score = ConflictResolver.calculate_agreement_score(ai1_result, ai2_result)
         
-        # High agreement - use average
-        if agreement_score >= 0.8:
-            conf1 = ai1_result.get("confidence", 0)
-            conf2 = ai2_result.get("confidence", 0)
-            return {
-                "method": "consensus",
-                "decision": ai1_result.get("decision", "exclude"),
-                "confidence": (conf1 + conf2) / 2,
-                "reasoning": f"High agreement (score: {agreement_score:.2f}). Combined assessment.",
-                "agreement_score": agreement_score
+        resolution = {
+            'agreement_score': agreement_score,
+            'resolution_method': '',
+            'final_decision': '',
+            'confidence': 0,
+            'reasoning': '',
+            'metadata': {
+                'ai1_confidence': ai1_result.get('confidence', 0),
+                'ai2_confidence': ai2_result.get('confidence', 0),
+                'conflict_type': 'decision_mismatch'
             }
+        }
         
-        # Medium agreement - use higher confidence
-        elif agreement_score >= 0.6:
-            if ai1_result.get("confidence", 0) >= ai2_result.get("confidence", 0):
-                primary = ai1_result
-                strategy = "conservative"
+        # High agreement (>80%) - take consensus
+        if agreement_score > 0.8:
+            resolution['resolution_method'] = 'consensus'
+            resolution['final_decision'] = ai1_result.get('decision', 'uncertain')
+            resolution['confidence'] = (ai1_result.get('confidence', 0) + ai2_result.get('confidence', 0)) / 2
+            resolution['reasoning'] = f"High agreement ({agreement_score:.2f}) between AI models. Consensus decision: {resolution['final_decision']}"
+        
+        # Moderate agreement (60-80%) - higher confidence wins
+        elif agreement_score > 0.6:
+            resolution['resolution_method'] = 'higher_confidence'
+            if ai1_result.get('confidence', 0) > ai2_result.get('confidence', 0):
+                resolution['final_decision'] = ai1_result.get('decision', 'uncertain')
+                resolution['confidence'] = ai1_result.get('confidence', 0)
+                resolution['reasoning'] = f"Moderate agreement ({agreement_score:.2f}). AI1 has higher confidence ({ai1_result.get('confidence', 0)}%)"
             else:
-                primary = ai2_result
-                strategy = "pragmatic"
-            
-            return {
-                "method": "higher_confidence",
-                "decision": primary.get("decision", "exclude"),
-                "confidence": primary.get("confidence", 0),
-                "reasoning": f"Medium agreement. Using {strategy} AI with higher confidence.",
-                "agreement_score": agreement_score
-            }
+                resolution['final_decision'] = ai2_result.get('decision', 'uncertain')
+                resolution['confidence'] = ai2_result.get('confidence', 0)
+                resolution['reasoning'] = f"Moderate agreement ({agreement_score:.2f}). AI2 has higher confidence ({ai2_result.get('confidence', 0)}%)"
         
-        # Low agreement - conflict detected
+        # Low agreement (<60%) - flag for human review
         else:
-            return {
-                "method": "conflict_detected",
-                "decision": "conflict",
-                "confidence": min(ai1_result.get("confidence", 0), ai2_result.get("confidence", 0)),
-                "reasoning": f"Low agreement (score: {agreement_score:.2f}). Manual review required.",
-                "agreement_score": agreement_score,
-                "ai1_decision": ai1_result.get("decision"),
-                "ai2_decision": ai2_result.get("decision")
-            }
+            resolution['resolution_method'] = 'conflict_detected'
+            resolution['final_decision'] = 'conflict'
+            resolution['confidence'] = 0
+            resolution['reasoning'] = f"Low agreement ({agreement_score:.2f}) between AI models. Human review required."
+            resolution['metadata']['conflict_type'] = 'major_disagreement'
+        
+        return resolution
 
-# Global performance tracker
-performance_tracker = PerformanceTracker()
+# --- File Parsing Functions ---
 
 def parse_xml_file(content: str) -> List[Dict[str, Any]]:
     """Enhanced XML parser supporting multiple formats"""
     citations = []
+    
     try:
         root = ET.fromstring(content)
         
-        # Try different XML structures
-        records = (root.findall('.//record') or 
-                  root.findall('.//citation') or 
-                  root.findall('.//item') or
-                  root.findall('.//reference'))
-        
-        for record in records:
-            citation: Dict[str, Any] = {'relevance_score': 0.5}
+        # Handle different XML namespaces and structures
+        for record in root.findall(".//record") + root.findall(".//citation") + root.findall(".//ref"):
+            citation = {}
             
-            # Extract title
-            title_elem = (record.find('.//title') or 
-                         record.find('.//article-title') or
-                         record.find('.//primary-title'))
-            if title_elem is not None and title_elem.text:
+            # Try multiple field mappings
+            title_elem = (record.find(".//title") or 
+                         record.find(".//article-title") or 
+                         record.find(".//atitle"))
+            if title_elem is not None:
                 citation['title'] = title_elem.text
             
-            # Extract authors
+            # Authors
             authors = []
-            for author in (record.findall('.//author') or 
-                          record.findall('.//name') or
-                          record.findall('.//contributor')):
-                author_text = author.text if author.text else ''
-                if not author_text:
-                    given = author.find('.//given-names')
-                    surname = author.find('.//surname')
-                    if given is not None and surname is not None and given.text and surname.text:
-                        author_text = f"{given.text} {surname.text}"
-                if author_text:
-                    authors.append(author_text)
-            
+            for author in record.findall(".//author") + record.findall(".//name"):
+                if author.text:
+                    authors.append(author.text)
             if authors:
                 citation['authors'] = '; '.join(authors)
             
-            # Extract other fields
-            journal_elem = (record.find('.//journal') or 
-                           record.find('.//source') or
-                           record.find('.//secondary-title'))
-            if journal_elem is not None and journal_elem.text:
+            # Journal
+            journal_elem = (record.find(".//journal") or 
+                          record.find(".//source") or 
+                          record.find(".//jtitle"))
+            if journal_elem is not None:
                 citation['journal'] = journal_elem.text
             
-            year_elem = (record.find('.//year') or 
-                        record.find('.//pub-date') or
-                        record.find('.//date'))
-            if year_elem is not None and year_elem.text:
+            # Year
+            year_elem = (record.find(".//year") or 
+                        record.find(".//date") or 
+                        record.find(".//pub-date"))
+            if year_elem is not None:
                 try:
-                    year_match = re.search(r'\d{4}', year_elem.text)
-                    if year_match:
-                        citation['year'] = int(year_match.group())
+                    citation['year'] = int(re.search(r'\d{4}', year_elem.text).group())
                 except:
                     pass
             
-            abstract_elem = record.find('.//abstract')
-            if abstract_elem is not None and abstract_elem.text:
+            # Abstract
+            abstract_elem = record.find(".//abstract")
+            if abstract_elem is not None:
                 citation['abstract'] = abstract_elem.text
             
-            doi_elem = record.find('.//doi')
-            if doi_elem is not None and doi_elem.text:
+            # DOI
+            doi_elem = record.find(".//doi")
+            if doi_elem is not None:
                 citation['doi'] = doi_elem.text
             
-            # Calculate relevance score
-            score = 0.3
-            if citation.get('title'): score += 0.2
-            if citation.get('abstract'): score += 0.3
-            if citation.get('authors'): score += 0.1
-            if citation.get('year'): score += 0.1
-            citation['relevance_score'] = min(score, 1.0)
-            
-            if citation.get('title'):
+            if citation:
+                # Calculate relevance score
+                score = 0.3
+                if citation.get('title'): score += 0.3
+                if citation.get('abstract'): score += 0.2
+                if citation.get('authors'): score += 0.1
+                if citation.get('year'): score += 0.1
+                citation['relevance_score'] = min(score, 1.0)
                 citations.append(citation)
-                
-    except ET.ParseError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid XML format: {str(e)}")
+    
+    except ET.ParseError:
+        pass
     
     return citations
 
 def parse_endnote_file(content: str) -> List[Dict[str, Any]]:
     """Parse EndNote tagged format (.enw) or XML format"""
-    citations = []
+    if content.strip().startswith('<'):
+        return parse_xml_file(content)
     
-    try:
-        if content.startswith('%'):
-            # EndNote tagged format (.enw)
-            records = content.split('\n\n')
-            
-            for record in records:
-                if not record.strip():
-                    continue
-                    
-                citation = {}
-                lines = record.strip().split('\n')
-                
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    
-                    if line.startswith('%T '):
-                        citation['title'] = line[3:].strip()
-                    elif line.startswith('%A '):
-                        authors = citation.get('authors', '')
-                        new_author = line[3:].strip()
-                        citation['authors'] = f"{authors}; {new_author}" if authors else new_author
-                    elif line.startswith('%J '):
-                        citation['journal'] = line[3:].strip()
-                    elif line.startswith('%D '):
-                        try:
-                            year_match = re.search(r'\d{4}', line[3:])
-                            if year_match:
-                                citation['year'] = int(year_match.group())
-                        except:
-                            pass
-                    elif line.startswith('%X '):
-                        citation['abstract'] = line[3:].strip()
-                    elif line.startswith('%R '):
-                        citation['doi'] = line[3:].strip()
-                    elif line.startswith('%K '):
-                        keywords = citation.get('keywords', '')
-                        new_keyword = line[3:].strip()
-                        citation['keywords'] = f"{keywords}; {new_keyword}" if keywords else new_keyword
-                
-                # Calculate relevance score
-                score = 0.3
-                if citation.get('title'): score += 0.2
-                if citation.get('abstract'): score += 0.3
-                if citation.get('authors'): score += 0.1
-                if citation.get('year'): score += 0.1
-                citation['relevance_score'] = min(score, 1.0)
-                
-                if citation.get('title'):
-                    citations.append(citation)
-        else:
-            # EndNote XML format - use existing XML parser
-            citations = parse_xml_file(content)
-            
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error parsing EndNote format: {str(e)}")
+    citations = []
+    current_citation = {}
+    
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        
+        if line.startswith('%0'):
+            if current_citation:
+                citations.append(current_citation)
+                current_citation = {}
+        elif line.startswith('%T'):
+            current_citation['title'] = line[3:]
+        elif line.startswith('%A'):
+            if 'authors' not in current_citation:
+                current_citation['authors'] = line[3:]
+            else:
+                current_citation['authors'] += '; ' + line[3:]
+        elif line.startswith('%J'):
+            current_citation['journal'] = line[3:]
+        elif line.startswith('%D'):
+            try:
+                current_citation['year'] = int(line[3:])
+            except:
+                pass
+        elif line.startswith('%X'):
+            current_citation['abstract'] = line[3:]
+        elif line.startswith('%R'):
+            current_citation['doi'] = line[3:]
+        elif line.startswith('%K'):
+            if 'keywords' not in current_citation:
+                current_citation['keywords'] = line[3:]
+            else:
+                current_citation['keywords'] += '; ' + line[3:]
+    
+    if current_citation:
+        citations.append(current_citation)
+    
+    # Add relevance scores
+    for citation in citations:
+        score = 0.3
+        if citation.get('title'): score += 0.3
+        if citation.get('abstract'): score += 0.2
+        if citation.get('authors'): score += 0.1
+        if citation.get('year'): score += 0.1
+        citation['relevance_score'] = min(score, 1.0)
     
     return citations
 
@@ -743,64 +569,50 @@ def parse_mendeley_file(content: str) -> List[Dict[str, Any]]:
     """Parse Mendeley BibTeX format (.bib)"""
     citations = []
     
-    try:
-        # Split into individual entries
-        entries = re.split(r'@\w+\s*\{', content)[1:]  # Skip empty first element
+    # Simple BibTeX parser
+    entries = re.findall(r'@\w+\{[^}]+,([^}]+)\}', content, re.DOTALL)
+    
+    for entry in entries:
+        citation = {}
         
-        for entry in entries:
-            if not entry.strip():
-                continue
-                
-            citation = {}
-            
-            # Extract fields using regex
-            title_match = re.search(r'title\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
-            if title_match:
-                citation['title'] = title_match.group(1).strip()
-            
-            author_match = re.search(r'author\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
-            if author_match:
-                authors = author_match.group(1).strip()
-                # Clean up BibTeX author format
-                authors = re.sub(r'\s+and\s+', '; ', authors)
-                citation['authors'] = authors
-            
-            journal_match = re.search(r'journal\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
-            if journal_match:
-                citation['journal'] = journal_match.group(1).strip()
-            
-            year_match = re.search(r'year\s*=\s*[{"]?(\d{4})[}"]?', entry, re.IGNORECASE)
-            if year_match:
-                citation['year'] = int(year_match.group(1))
-            
-            abstract_match = re.search(r'abstract\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
-            if abstract_match:
-                citation['abstract'] = abstract_match.group(1).strip()
-            
-            doi_match = re.search(r'doi\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE)
-            if doi_match:
-                citation['doi'] = doi_match.group(1).strip()
-            
-            keywords_match = re.search(r'keywords\s*=\s*[{"]([^}"]*)[}"]', entry, re.IGNORECASE | re.DOTALL)
-            if keywords_match:
-                keywords = keywords_match.group(1).strip()
-                # Clean up BibTeX keywords format
-                keywords = re.sub(r',\s*', '; ', keywords)
-                citation['keywords'] = keywords
-            
+        # Extract fields
+        title_match = re.search(r'title\s*=\s*["{]([^"}]+)["}]', entry, re.IGNORECASE)
+        if title_match:
+            citation['title'] = title_match.group(1)
+        
+        author_match = re.search(r'author\s*=\s*["{]([^"}]+)["}]', entry, re.IGNORECASE)
+        if author_match:
+            citation['authors'] = author_match.group(1)
+        
+        journal_match = re.search(r'journal\s*=\s*["{]([^"}]+)["}]', entry, re.IGNORECASE)
+        if journal_match:
+            citation['journal'] = journal_match.group(1)
+        
+        year_match = re.search(r'year\s*=\s*["{]?(\d{4})["}]?', entry, re.IGNORECASE)
+        if year_match:
+            citation['year'] = int(year_match.group(1))
+        
+        abstract_match = re.search(r'abstract\s*=\s*["{]([^"}]+)["}]', entry, re.IGNORECASE)
+        if abstract_match:
+            citation['abstract'] = abstract_match.group(1)
+        
+        doi_match = re.search(r'doi\s*=\s*["{]([^"}]+)["}]', entry, re.IGNORECASE)
+        if doi_match:
+            citation['doi'] = doi_match.group(1)
+        
+        keywords_match = re.search(r'keywords\s*=\s*["{]([^"}]+)["}]', entry, re.IGNORECASE)
+        if keywords_match:
+            citation['keywords'] = keywords_match.group(1)
+        
+        if citation:
             # Calculate relevance score
             score = 0.3
-            if citation.get('title'): score += 0.2
-            if citation.get('abstract'): score += 0.3
+            if citation.get('title'): score += 0.3
+            if citation.get('abstract'): score += 0.2
             if citation.get('authors'): score += 0.1
             if citation.get('year'): score += 0.1
             citation['relevance_score'] = min(score, 1.0)
-            
-            if citation.get('title'):
-                citations.append(citation)
-                
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error parsing Mendeley/BibTeX format: {str(e)}")
+            citations.append(citation)
     
     return citations
 
@@ -808,134 +620,53 @@ def parse_zotero_file(content: str) -> List[Dict[str, Any]]:
     """Parse Zotero RDF format (.rdf) or CSL JSON format"""
     citations = []
     
-    try:
-        if content.strip().startswith('<?xml') or '<rdf:RDF' in content:
-            # Zotero RDF format
-            root = ET.fromstring(content)
-            
-            # Define namespaces
-            namespaces = {
-                'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-                'dc': 'http://purl.org/dc/elements/1.1/',
-                'dcterms': 'http://purl.org/dc/terms/',
-                'z': 'http://www.zotero.org/namespaces/export#'
-            }
-            
-            # Find all items
-            items = root.findall('.//rdf:Description[@rdf:about]', namespaces)
+    if content.strip().startswith('{') or content.strip().startswith('['):
+        # JSON format
+        try:
+            data = json.loads(content)
+            if isinstance(data, list):
+                items = data
+            else:
+                items = data.get('items', [])
             
             for item in items:
-                citation = {}
+                citation = {
+                    'title': item.get('title', ''),
+                    'journal': item.get('container-title', ''),
+                    'year': item.get('issued', {}).get('date-parts', [[None]])[0][0] if item.get('issued') else None,
+                    'abstract': item.get('abstract', ''),
+                    'doi': item.get('DOI', ''),
+                }
                 
-                # Extract title
-                title_elem = item.find('.//dc:title', namespaces)
-                if title_elem is not None and title_elem.text:
-                    citation['title'] = title_elem.text.strip()
-                
-                # Extract authors
-                creator_elems = item.findall('.//dc:creator', namespaces)
-                if creator_elems:
-                    authors = [elem.text.strip() for elem in creator_elems if elem.text]
-                    citation['authors'] = '; '.join(authors)
-                
-                # Extract source/journal
-                source_elem = item.find('.//dc:source', namespaces)
-                if source_elem is not None and source_elem.text:
-                    citation['journal'] = source_elem.text.strip()
-                
-                # Extract date/year
-                date_elem = item.find('.//dc:date', namespaces)
-                if date_elem is not None and date_elem.text:
-                    year_match = re.search(r'\d{4}', date_elem.text)
-                    if year_match:
-                        citation['year'] = int(year_match.group())
-                
-                # Extract abstract
-                description_elem = item.find('.//dc:description', namespaces)
-                if description_elem is not None and description_elem.text:
-                    citation['abstract'] = description_elem.text.strip()
-                
-                # Extract identifier (DOI)
-                identifier_elem = item.find('.//dc:identifier', namespaces)
-                if identifier_elem is not None and identifier_elem.text:
-                    identifier = identifier_elem.text.strip()
-                    if 'doi' in identifier.lower() or identifier.startswith('10.'):
-                        citation['doi'] = identifier
-                
-                # Extract subjects as keywords
-                subject_elems = item.findall('.//dc:subject', namespaces)
-                if subject_elems:
-                    keywords = [elem.text.strip() for elem in subject_elems if elem.text]
-                    citation['keywords'] = '; '.join(keywords)
-                
-                # Calculate relevance score
-                score = 0.3
-                if citation.get('title'): score += 0.2
-                if citation.get('abstract'): score += 0.3
-                if citation.get('authors'): score += 0.1
-                if citation.get('year'): score += 0.1
-                citation['relevance_score'] = min(score, 1.0)
+                # Authors
+                authors = item.get('author', [])
+                if authors:
+                    author_names = []
+                    for author in authors:
+                        if 'family' in author and 'given' in author:
+                            author_names.append(f"{author['given']} {author['family']}")
+                        elif 'literal' in author:
+                            author_names.append(author['literal'])
+                    citation['authors'] = '; '.join(author_names)
                 
                 if citation.get('title'):
+                    # Calculate relevance score
+                    score = 0.3
+                    if citation.get('title'): score += 0.3
+                    if citation.get('abstract'): score += 0.2
+                    if citation.get('authors'): score += 0.1
+                    if citation.get('year'): score += 0.1
+                    citation['relevance_score'] = min(score, 1.0)
                     citations.append(citation)
-        else:
-            # Try CSL JSON format
-            try:
-                data = json.loads(content)
-                if isinstance(data, list):
-                    for item in data:
-                        citation = {}
-                        
-                        if 'title' in item:
-                            citation['title'] = item['title']
-                        
-                        if 'author' in item:
-                            authors = []
-                            for author in item['author']:
-                                if isinstance(author, dict):
-                                    if 'family' in author and 'given' in author:
-                                        authors.append(f"{author['family']}, {author['given']}")
-                                    elif 'family' in author:
-                                        authors.append(author['family'])
-                                elif isinstance(author, str):
-                                    authors.append(author)
-                            citation['authors'] = '; '.join(authors)
-                        
-                        if 'container-title' in item:
-                            citation['journal'] = item['container-title']
-                        
-                        if 'issued' in item and 'date-parts' in item['issued']:
-                            try:
-                                citation['year'] = item['issued']['date-parts'][0][0]
-                            except:
-                                pass
-                        
-                        if 'abstract' in item:
-                            citation['abstract'] = item['abstract']
-                        
-                        if 'DOI' in item:
-                            citation['doi'] = item['DOI']
-                        
-                        # Calculate relevance score
-                        score = 0.3
-                        if citation.get('title'): score += 0.2
-                        if citation.get('abstract'): score += 0.3
-                        if citation.get('authors'): score += 0.1
-                        if citation.get('year'): score += 0.1
-                        citation['relevance_score'] = min(score, 1.0)
-                        
-                        if citation.get('title'):
-                            citations.append(citation)
-            except json.JSONDecodeError:
-                # If JSON parsing fails, try as generic XML
-                citations = parse_xml_file(content)
-                
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error parsing Zotero format: {str(e)}")
+        except:
+            pass
+    else:
+        # RDF format - parse as XML
+        citations = parse_xml_file(content)
     
     return citations
 
-# --- 5. Dynamic LLM Provider Factory ---
+# --- LLM Provider Factory ---
 
 class LLMProviderFactory:
     """Factory for creating LLM instances across different providers"""
@@ -949,7 +680,6 @@ class LLMProviderFactory:
             return ChatOpenAI(
                 model=config.model,
                 temperature=config.temperature,
-                max_tokens=config.max_tokens,
                 api_key=config.api_key or os.getenv("OPENAI_API_KEY")
             )
         elif provider == "anthropic":
@@ -958,33 +688,24 @@ class LLMProviderFactory:
                 return ChatAnthropic(
                     model=config.model,
                     temperature=config.temperature,
-                    max_tokens=config.max_tokens,
                     api_key=config.api_key or os.getenv("ANTHROPIC_API_KEY")
                 )
             except ImportError:
-                raise ImportError("langchain_anthropic not installed. Install with: pip install langchain-anthropic")
+                # Fallback to OpenAI-compatible for Anthropic
+                return ChatOpenAI(
+                    model=config.model,
+                    temperature=config.temperature,
+                    base_url="https://api.anthropic.com/v1",
+                    api_key=config.api_key or os.getenv("ANTHROPIC_API_KEY")
+                )
         elif provider == "ollama":
-            try:
-                from langchain_ollama import ChatOllama
-                return ChatOllama(
-                    model=config.model,
-                    temperature=config.temperature,
-                    base_url=config.endpoint or "http://localhost:11434"
-                )
-            except ImportError:
-                raise ImportError("langchain_ollama not installed. Install with: pip install langchain-ollama")
-        elif provider == "cohere":
-            try:
-                from langchain_cohere import ChatCohere
-                return ChatCohere(
-                    model=config.model,
-                    temperature=config.temperature,
-                    cohere_api_key=config.api_key or os.getenv("COHERE_API_KEY")
-                )
-            except ImportError:
-                raise ImportError("langchain_cohere not installed. Install with: pip install langchain-cohere")
+            return ChatOpenAI(
+                model=config.model,
+                temperature=config.temperature,
+                base_url=config.endpoint or "http://localhost:11434/v1",
+                api_key="ollama"
+            )
         elif provider == "groq":
-            # Groq uses OpenAI-compatible API
             return ChatOpenAI(
                 model=config.model,
                 temperature=config.temperature,
@@ -992,15 +713,13 @@ class LLMProviderFactory:
                 api_key=config.api_key or os.getenv("GROQ_API_KEY")
             )
         elif provider == "together":
-            # Together AI uses OpenAI-compatible API
             return ChatOpenAI(
                 model=config.model,
                 temperature=config.temperature,
                 base_url=config.endpoint or "https://api.together.xyz/v1",
                 api_key=config.api_key or os.getenv("TOGETHER_API_KEY")
             )
-        elif provider in ["openai_compatible", "custom"]:
-            # Generic OpenAI-compatible endpoint for local models and custom providers
+        elif provider in ["openai_compatible", "custom", "cohere"]:
             return ChatOpenAI(
                 model=config.model,
                 temperature=config.temperature,
@@ -1016,7 +735,7 @@ class LLMProviderFactory:
                 api_key=config.api_key or "dummy-key"
             )
 
-# --- 6. Advanced Prompt Engineering with LangChain ---
+# --- Prompt Template Factory ---
 
 class PromptTemplateFactory:
     """Factory for creating dynamic prompt templates"""
@@ -1024,278 +743,157 @@ class PromptTemplateFactory:
     @staticmethod
     def create_screening_prompt(strategy: Literal["conservative", "pragmatic"]) -> ChatPromptTemplate:
         """Create LangChain prompt template for screening"""
-        
         if strategy == "conservative":
-            persona = "Dr. Sarah Chen, a meticulous Cochrane systematic reviewer"
-            approach = "conservative, rigorous approach that minimizes false positives"
-            decision_rule = "When in doubt, EXCLUDE the study"
-            temperature_note = "Be stringent in your evaluation"
+            system_message = """You are a conservative systematic review screening AI. Your role is to be highly selective and only include studies that clearly and unambiguously meet all inclusion criteria. When in doubt, exclude the study.
+
+Screening Guidelines:
+- Apply strict interpretation of inclusion/exclusion criteria
+- Require clear evidence for all PICO components
+- Exclude studies with any methodological concerns
+- Prefer high-quality study designs (RCTs, systematic reviews)
+- Be cautious about studies with limited sample sizes or unclear methodology"""
         else:
-            persona = "Dr. Michael Rodriguez, a pragmatic evidence synthesizer" 
-            approach = "inclusive, pragmatic approach that captures potentially relevant evidence"
-            decision_rule = "When uncertain, lean toward INCLUSION for human review"
-            temperature_note = "Consider broader relevance and transferability"
+            system_message = """You are a pragmatic systematic review screening AI. Your role is to be inclusive and capture potentially relevant studies that could contribute to the review. When criteria are ambiguous, err on the side of inclusion.
 
-        system_template = f"""You are {persona} conducting systematic review screening with a {approach}.
+Screening Guidelines:
+- Apply flexible interpretation of inclusion/exclusion criteria
+- Include studies that partially meet PICO components if potentially relevant
+- Consider various study designs and methodologies
+- Include studies that could provide valuable insights even with limitations
+- Focus on potential contribution to the research question"""
+        
+        human_message = """Please screen this citation for systematic review inclusion based on the provided criteria.
 
-EVALUATION APPROACH: {temperature_note}
-DECISION RULE: {decision_rule}
+**Research Question**: {research_question}
 
-Your task is to evaluate research studies against specific inclusion/exclusion criteria and provide structured output.
+**PICO Criteria**:
+- Population: {population}
+- Intervention: {intervention}
+- Comparison: {comparison}
+- Outcome: {outcome}
 
-RESEARCH QUESTION: {{research_question}}
+**Additional Criteria**:
+- Study Types: {study_types}
+- Timeframe: {timeframe}
+- Language: {inclusion_language}
+- Other Inclusion: {other_inclusion}
+- Other Exclusion: {other_exclusion}
 
-PICO-TT CRITERIA:
-{{pico_criteria}}
-
-INCLUSION CRITERIA:
-{{inclusion_criteria}}
-
-EXCLUSION CRITERIA:
-{{exclusion_criteria}}
-
-Evaluate the study carefully and provide your assessment in the exact JSON format specified in the output schema.
-{decision_rule}"""
-
-        human_template = """STUDY TO EVALUATE:
+**Citation to Screen**:
 Title: {title}
 Authors: {authors}
-Journal: {journal} ({year})
+Journal: {journal}
+Year: {year}
 Abstract: {abstract}
+Keywords: {keywords}
 
-Please provide your structured evaluation of this study."""
+{format_instructions}
 
+Provide your screening decision with detailed reasoning."""
+        
         return ChatPromptTemplate.from_messages([
-            ("system", system_template),
-            ("human", human_template)
+            ("system", system_message),
+            ("human", human_message)
         ])
 
 def create_advanced_prompt(criteria: AdvancedScreeningCriteria, strategy: Literal["conservative", "pragmatic"]) -> ChatPromptTemplate:
     """Create sophisticated prompts based on screening strategy"""
-    
-    if strategy == "conservative":
-        persona = "Dr. Sarah Chen, a meticulous Cochrane systematic reviewer"
-        approach = "conservative, rigorous approach that minimizes false positives"
-        decision_rule = "When in doubt, EXCLUDE the study"
-        temperature_note = "Be stringent in your evaluation"
-    else:
-        persona = "Dr. Michael Rodriguez, a pragmatic evidence synthesizer"
-        approach = "inclusive, pragmatic approach that captures potentially relevant evidence"
-        decision_rule = "When uncertain, lean toward INCLUSION for human review"
-        temperature_note = "Consider broader relevance and transferability"
-    
-    # Build comprehensive criteria text
-    criteria_sections = []
-    if criteria.population:
-        criteria_sections.append(f"Population: {criteria.population}")
-    if criteria.intervention:
-        criteria_sections.append(f"Intervention: {criteria.intervention}")
-    if criteria.comparison:
-        criteria_sections.append(f"Comparison: {criteria.comparison}")
-    if criteria.outcome:
-        criteria_sections.append(f"Outcomes: {criteria.outcome}")
-    if criteria.timeframe:
-        criteria_sections.append(f"Timeframe: {criteria.timeframe}")
-    if criteria.studyTypes:
-        criteria_sections.append(f"Study Types: {criteria.studyTypes}")
-    
-    inclusion_criteria = []
-    if criteria.inclusionLanguage:
-        inclusion_criteria.append(f"Language: {criteria.inclusionLanguage}")
-    if criteria.inclusionPublication:
-        inclusion_criteria.append(f"Publication: {criteria.inclusionPublication}")
-    if criteria.inclusionSampleSize:
-        inclusion_criteria.append(f"Sample Size: {criteria.inclusionSampleSize}")
-    if criteria.inclusionDataAvailability:
-        inclusion_criteria.append(f"Data: {criteria.inclusionDataAvailability}")
-    if criteria.otherInclusion:
-        inclusion_criteria.append(f"Other: {criteria.otherInclusion}")
-    
-    exclusion_criteria = []
-    if criteria.exclusionStudyTypes:
-        exclusion_criteria.append(f"Study Types: {criteria.exclusionStudyTypes}")
-    if criteria.exclusionPopulations:
-        exclusion_criteria.append(f"Populations: {criteria.exclusionPopulations}")
-    if criteria.exclusionInterventions:
-        exclusion_criteria.append(f"Interventions: {criteria.exclusionInterventions}")
-    if criteria.exclusionLanguages:
-        exclusion_criteria.append(f"Languages: {criteria.exclusionLanguages}")
-    if criteria.otherExclusion:
-        exclusion_criteria.append(f"Other: {criteria.otherExclusion}")
-    
-    prompt = f"""You are {persona} conducting systematic review screening with a {approach}.
+    return PromptTemplateFactory.create_screening_prompt(strategy)
 
-RESEARCH QUESTION: {criteria.researchQuestion}
+# --- Advanced Screening with Multiple Providers ---
 
-PICO-TT CRITERIA:
-{chr(10).join(criteria_sections) if criteria_sections else "No specific criteria provided"}
-
-INCLUSION CRITERIA:
-{chr(10).join(inclusion_criteria) if inclusion_criteria else "Standard inclusion criteria apply"}
-
-EXCLUSION CRITERIA:
-{chr(10).join(exclusion_criteria) if exclusion_criteria else "Standard exclusion criteria apply"}
-
-EVALUATION APPROACH: {temperature_note}
-DECISION RULE: {decision_rule}
-
-STUDY TO EVALUATE:
-Title: {{title}}
-Authors: {{authors}}
-Journal: {{journal}} ({{year}})
-Abstract: {{abstract}}
-
-Provide your evaluation in JSON format:
-{{
-  "decision": "include" or "exclude",
-  "confidence": 0-100,
-  "reasoning": "detailed explanation of your decision",
-  "pico": {{
-    "population_score": 0.0-1.0,
-    "intervention_score": 0.0-1.0,
-    "comparison_score": 0.0-1.0,
-    "outcome_score": 0.0-1.0
-  }},
-  "study_design": "identified study type",
-  "quality_assessment": "High/Medium/Low quality rating"
-}}
-
-{decision_rule}"""
-    
-    return prompt
-
-# --- 6. Enhanced Background Processing ---
+performance_tracker = PerformanceTracker()
 
 async def advanced_screening_task(result_id: str, job_id: str, llm_configs: Dict[str, Any]):
     """Advanced screening with multiple LLM provider support"""
     db = SessionLocal()
     try:
+        # Get the screening result record
         result = db.query(ScreeningResult).filter(ScreeningResult.id == result_id).first()
-        if not result or result.status != 'pending':
+        if not result:
             return
         
+        # Get the citation
+        citation = db.query(CitationRecord).filter(CitationRecord.id == result.citation_id).first()
+        if not citation:
+            return
+        
+        # Get project criteria
+        project = db.query(Project).filter(Project.id == result.project_id).first()
+        if not project:
+            return
+        
+        # Update status to processing
         result.status = "processing"
         db.commit()
         
-        citation = db.query(CitationRecord).filter(CitationRecord.id == result.citation_id).first()
-        project = db.query(Project).filter(Project.id == result.project_id).first()
+        # Extract criteria
+        criteria_dict = project.criteria or {}
+        criteria = AdvancedScreeningCriteria(**criteria_dict)
         
-        if not citation or not project or not project.criteria:
-            raise ValueError("Citation, Project, or Criteria not found")
-        
-        criteria = AdvancedScreeningCriteria(**project.criteria)
-        
-        # Create prompt templates for both strategies
-        conservative_template = PromptTemplateFactory.create_screening_prompt("conservative")
-        pragmatic_template = PromptTemplateFactory.create_screening_prompt("pragmatic")
-        
-        # Build criteria strings for prompts
-        pico_criteria = []
-        if criteria.population:
-            pico_criteria.append(f"Population: {criteria.population}")
-        if criteria.intervention:
-            pico_criteria.append(f"Intervention: {criteria.intervention}")
-        if criteria.comparison:
-            pico_criteria.append(f"Comparison: {criteria.comparison}")
-        if criteria.outcome:
-            pico_criteria.append(f"Outcomes: {criteria.outcome}")
-        if criteria.timeframe:
-            pico_criteria.append(f"Timeframe: {criteria.timeframe}")
-        if criteria.studyTypes:
-            pico_criteria.append(f"Study Types: {criteria.studyTypes}")
-        
-        inclusion_criteria = []
-        if criteria.inclusionLanguage:
-            inclusion_criteria.append(f"Language: {criteria.inclusionLanguage}")
-        if criteria.inclusionPublication:
-            inclusion_criteria.append(f"Publication: {criteria.inclusionPublication}")
-        if criteria.inclusionSampleSize:
-            inclusion_criteria.append(f"Sample Size: {criteria.inclusionSampleSize}")
-        if criteria.inclusionDataAvailability:
-            inclusion_criteria.append(f"Data: {criteria.inclusionDataAvailability}")
-        if criteria.otherInclusion:
-            inclusion_criteria.append(f"Other: {criteria.otherInclusion}")
-        
-        exclusion_criteria = []
-        if criteria.exclusionStudyTypes:
-            exclusion_criteria.append(f"Study Types: {criteria.exclusionStudyTypes}")
-        if criteria.exclusionPopulations:
-            exclusion_criteria.append(f"Populations: {criteria.exclusionPopulations}")
-        if criteria.exclusionInterventions:
-            exclusion_criteria.append(f"Interventions: {criteria.exclusionInterventions}")
-        if criteria.exclusionLanguages:
-            exclusion_criteria.append(f"Languages: {criteria.exclusionLanguages}")
-        if criteria.otherExclusion:
-            exclusion_criteria.append(f"Other: {criteria.otherExclusion}")
+        # Create prompt templates
+        conservative_template = create_advanced_prompt(criteria, "conservative")
+        pragmatic_template = create_advanced_prompt(criteria, "pragmatic")
         
         # Prepare prompt variables
         prompt_variables = {
-            "research_question": criteria.researchQuestion or "Systematic review research question not specified",
-            "pico_criteria": "\n".join(pico_criteria) if pico_criteria else "No specific PICO criteria provided",
-            "inclusion_criteria": "\n".join(inclusion_criteria) if inclusion_criteria else "Standard inclusion criteria apply",
-            "exclusion_criteria": "\n".join(exclusion_criteria) if exclusion_criteria else "Standard exclusion criteria apply",
+            "research_question": criteria.researchQuestion,
+            "population": criteria.population,
+            "intervention": criteria.intervention,
+            "comparison": criteria.comparison,
+            "outcome": criteria.outcome,
+            "study_types": criteria.studyTypes,
+            "timeframe": criteria.timeframe,
+            "inclusion_language": criteria.inclusionLanguage,
+            "other_inclusion": criteria.otherInclusion,
+            "other_exclusion": criteria.otherExclusion,
             "title": citation.title or "",
             "authors": citation.authors or "",
             "journal": citation.journal or "",
             "year": str(citation.year) if citation.year else "",
-            "abstract": citation.abstract or ""
+            "abstract": citation.abstract or "",
+            "keywords": citation.keywords or ""
         }
         
-        # Call AI models with structured prompts
+        # Get LLM configurations
         ai1_config = llm_configs.get('ai1', {})
         ai2_config = llm_configs.get('ai2', {})
         
+        # Call both LLMs
         ai1_result = await call_llm_api(ai1_config, conservative_template, prompt_variables)
         ai2_result = await call_llm_api(ai2_config, pragmatic_template, prompt_variables)
         
-        # Process results
+        # Store results
         result.ai1_result = ai1_result
         result.ai2_result = ai2_result
         
-        # Determine final decision
-        ai1_decision = ai1_result.get('decision', 'exclude')
-        ai2_decision = ai2_result.get('decision', 'exclude')
-        ai1_confidence = ai1_result.get('confidence', 50)
-        ai2_confidence = ai2_result.get('confidence', 50)
-        
-        if ai1_decision == ai2_decision:
-            result.final_decision = ai1_decision
-            result.confidence_score = (ai1_confidence + ai2_confidence) / 2
+        # Resolve conflicts
+        if ai1_result.get('decision') == ai2_result.get('decision'):
+            # Agreement - use consensus
+            result.final_decision = ai1_result.get('decision')
+            result.confidence_score = (ai1_result.get('confidence', 0) + ai2_result.get('confidence', 0)) / 200.0  # Convert to 0-1 scale
         else:
-            result.final_decision = "conflict"
-            result.confidence_score = abs(ai1_confidence - ai2_confidence)
+            # Conflict - use resolver
+            resolution = ConflictResolver.resolve_conflict(ai1_result, ai2_result, {
+                'title': citation.title,
+                'abstract': citation.abstract
+            })
+            result.final_decision = resolution['final_decision']
+            result.confidence_score = resolution['confidence'] / 100.0  # Convert to 0-1 scale
         
         result.status = "completed"
         result.processed_at = datetime.utcnow()
         
-        # Log activity
-        activity = ActivityLog(
-            project_id=result.project_id,
-            action="citation_screened",
-            details={
-                "citation_id": str(result.citation_id),
-                "decision": result.final_decision,
-                "confidence": result.confidence_score
-            }
-        )
-        db.add(activity)
+        db.commit()
         
     except Exception as e:
-        if result:
+        # Handle errors
+        if 'result' in locals():
             result.status = "error"
             result.ai1_result = {"error": str(e)}
             result.ai2_result = {"error": str(e)}
-            
-            # Log error
-            activity = ActivityLog(
-                project_id=result.project_id,
-                action="screening_error",
-                details={"error": str(e), "citation_id": str(result.citation_id)}
-            )
-            db.add(activity)
-        
+            db.commit()
     finally:
-        db.commit()
         db.close()
 
 async def call_llm_api(config: Dict[str, Any], prompt_template: ChatPromptTemplate, prompt_variables: Dict[str, str]) -> Dict[str, Any]:
@@ -1328,10 +926,14 @@ async def call_llm_api(config: Dict[str, Any], prompt_template: ChatPromptTempla
                 "decision": structured_result.decision,
                 "confidence": float(structured_result.confidence),
                 "reasoning": structured_result.reasoning,
-                "pico": structured_result.pico_scores,
+                "evidence_quotes": structured_result.evidence_quotes,
+                "criteria_assessment": structured_result.criteria_assessment,
+                "quality_indicators": structured_result.quality_indicators,
+                "pico_scores": structured_result.pico_scores,
                 "study_design": structured_result.study_design,
                 "quality_assessment": structured_result.quality_assessment,
-                "key_findings": structured_result.key_findings
+                "key_findings": structured_result.key_findings,
+                "processing_metadata": structured_result.processing_metadata
             }
             
         except Exception as parse_error:
@@ -1344,10 +946,14 @@ async def call_llm_api(config: Dict[str, Any], prompt_template: ChatPromptTempla
             "decision": "exclude",
             "confidence": 0,
             "reasoning": f"API Error: {str(e)}",
-            "pico": {"population": 0, "intervention": 0, "comparison": 0, "outcome": 0},
+            "evidence_quotes": [],
+            "criteria_assessment": {},
+            "quality_indicators": {},
+            "pico_scores": {"population": 0, "intervention": 0, "comparison": 0, "outcome": 0},
             "study_design": "Unknown",
             "quality_assessment": "unclear",
             "key_findings": [],
+            "processing_metadata": {},
             "error": True
         }
 
@@ -1355,56 +961,47 @@ def parse_llm_response(response_text: str) -> Dict[str, Any]:
     """Parse LLM response with fallback handling"""
     try:
         # Try to extract JSON from response
-        if isinstance(response_text, str):
-            # Look for JSON in markdown code blocks
-            json_match = re.search(r'```json\s*(.*?)\s*```', response_text, re.DOTALL)
-            if json_match:
-                response_text = json_match.group(1)
-            
-            # Try to parse as JSON
-            parsed = json.loads(response_text)
-        else:
-            parsed = response_text
-        
-        # Normalize and validate response
-        return {
-            "decision": parsed.get('decision', 'exclude').lower(),
-            "confidence": float(parsed.get('confidence', 50)),
-            "reasoning": str(parsed.get('reasoning', 'No reasoning provided')),
-            "pico": parsed.get('pico', {
-                "population_score": 0.5,
-                "intervention_score": 0.5,
-                "comparison_score": 0.5,
-                "outcome_score": 0.5
-            }),
-            "study_design": str(parsed.get('study_design', 'Unknown')),
-            "quality_assessment": str(parsed.get('quality_assessment', 'Unknown'))
-        }
-        
-    except Exception as e:
-        # Fallback parsing for non-JSON responses
-        decision = 'exclude'
-        if 'include' in response_text.lower():
-            decision = 'include'
-        
-        return {
-            "decision": decision,
-            "confidence": 50,
-            "reasoning": response_text[:200] + "..." if len(response_text) > 200 else response_text,
-            "pico": {
-                "population_score": 0.5,
-                "intervention_score": 0.5,
-                "comparison_score": 0.5,
-                "outcome_score": 0.5
-            },
-            "study_design": "Unknown",
-            "quality_assessment": "Unknown",
-            "parse_error": str(e)
-        }
+        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if json_match:
+            parsed = json.loads(json_match.group())
+            return parsed
+    except:
+        pass
+    
+    # Fallback parsing
+    decision = "uncertain"
+    confidence = 50
+    reasoning = response_text[:500] if response_text else "No response received"
+    
+    # Try to extract decision
+    if any(word in response_text.lower() for word in ["include", "accept", "yes"]):
+        decision = "include"
+        confidence = 70
+    elif any(word in response_text.lower() for word in ["exclude", "reject", "no"]):
+        decision = "exclude"
+        confidence = 70
+    
+    return {
+        "decision": decision,
+        "confidence": confidence,
+        "reasoning": reasoning,
+        "evidence_quotes": [],
+        "criteria_assessment": {},
+        "quality_indicators": {},
+        "pico_scores": {"population": 0.5, "intervention": 0.5, "comparison": 0.5, "outcome": 0.5},
+        "study_design": "Unknown",
+        "quality_assessment": "unclear",
+        "key_findings": [],
+        "processing_metadata": {},
+        "fallback_parsing": True
+    }
 
-# --- 7. Enhanced Frontend ---
+# --- Routes ---
 
-HTML_CONTENT = """
+@app.get("/", response_class=HTMLResponse)
+async def get_frontend():
+    """Serve the enhanced frontend"""
+    return HTMLResponse("""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1426,878 +1023,254 @@ HTML_CONTENT = """
             flex-direction: column;
         }
 
-        /* Progress Bar */
-        .progress-bar {
-            width: 100%;
-            height: 4px;
-            background-color: #e9ecef;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #3498db 0%, #2ecc71 100%);
-            transition: width 0.3s ease;
-            position: relative;
-        }
-
-        .progress-text {
-            position: absolute;
-            top: -20px;
-            right: 0;
-            font-size: 0.8rem;
-            color: #6c757d;
-        }
-
         .header {
-            background-color: #2c3e50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            position: relative;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         .header h1 {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
+            font-size: 1.8rem;
+            font-weight: 300;
         }
 
-        .header .subtitle {
-            font-size: 0.9rem;
-            color: #bdc3c7;
-            margin-bottom: 1rem;
+        .header p {
+            opacity: 0.9;
+            margin-top: 0.5rem;
         }
 
-        /* Screening Mode Selector */
-        .screening-mode-selector {
-            background-color: #34495e;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-
-        .screening-mode-selector h3 {
-            color: #ecf0f1;
-            margin-bottom: 0.75rem;
-            font-size: 1rem;
-        }
-
-        .mode-buttons {
+        .container {
             display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
+            flex: 1;
+            overflow: hidden;
         }
 
-        .mode-button {
-            background-color: #2c3e50;
-            color: #bdc3c7;
-            border: 2px solid transparent;
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
+        .left-panel {
+            width: 350px;
+            background: white;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
-        .mode-button:hover {
-            background-color: #3a526b;
-            border-color: #3498db;
-        }
-
-        .mode-button.active {
-            background-color: #3498db;
-            color: white;
-            border-color: #3498db;
-        }
-
-        /* Criteria Configuration */
         .criteria-section {
-            background-color: #2c3e50;
             padding: 1.5rem;
-            border-radius: 8px;
+            border-bottom: 1px solid #e0e0e0;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .criteria-section h3 {
+            margin-bottom: 1rem;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        .form-group {
             margin-bottom: 1rem;
         }
 
-        .pico-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .pico-item {
-            background-color: #34495e;
-            padding: 1rem;
-            border-radius: 6px;
-        }
-
-        .pico-item label {
+        .form-group label {
             display: block;
+            margin-bottom: 0.3rem;
+            font-weight: 500;
+            color: #555;
             font-size: 0.9rem;
-            color: #ecf0f1;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
         }
 
-        .pico-item textarea {
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
             width: 100%;
             padding: 0.5rem;
+            border: 1px solid #ddd;
             border-radius: 4px;
-            border: 1px solid #bdc3c7;
-            font-size: 0.85rem;
-            background-color: white;
-            min-height: 60px;
+            font-size: 0.9rem;
+        }
+
+        .form-group textarea {
+            height: 60px;
             resize: vertical;
         }
 
-        .criteria-details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .criteria-column {
-            background-color: #34495e;
-            padding: 1rem;
-            border-radius: 6px;
-        }
-
-        .criteria-column h4 {
-            color: #ecf0f1;
-            margin-bottom: 1rem;
-            font-size: 1rem;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 0.5rem;
-        }
-
-        .criteria-item {
-            margin-bottom: 1rem;
-        }
-
-        .criteria-item label {
-            display: block;
-            font-size: 0.9rem;
-            color: #bdc3c7;
-            font-weight: bold;
-            margin-bottom: 0.25rem;
-        }
-
-        .criteria-item input, .criteria-item textarea {
-            width: 100%;
-            padding: 0.5rem;
-            border-radius: 4px;
-            border: 1px solid #bdc3c7;
-            font-size: 0.85rem;
-            background-color: white;
-            min-height: 35px;
-        }
-
-        .research-question {
-            background-color: #34495e;
-            padding: 1rem;
-            border-radius: 6px;
-            margin-bottom: 1.5rem;
-        }
-
-        .research-question h4 {
-            color: #e74c3c;
-            margin-bottom: 0.75rem;
-            font-size: 1rem;
-        }
-
-        .research-question textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border-radius: 4px;
-            border: 2px solid #e74c3c;
-            font-size: 0.9rem;
-            background-color: white;
-            min-height: 80px;
-            font-weight: 500;
-        }
-
-        /* LLM Configuration */
         .llm-config {
-            background-color: #34495e;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-top: 1rem;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e0e0e0;
         }
 
-        .llm-config h3 {
-            margin-bottom: 0.5rem;
-            color: #ecf0f1;
-        }
-
-        .config-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
+        .llm-config h4 {
+            color: #333;
             margin-bottom: 1rem;
+            font-size: 1rem;
         }
 
         .config-section {
-            background-color: #2c3e50;
+            margin-bottom: 1.5rem;
             padding: 1rem;
+            border: 1px solid #e0e0e0;
             border-radius: 6px;
-            border: 1px solid #34495e;
-        }
-
-        .config-section h4 {
-            color: #3498db;
-            margin-bottom: 0.75rem;
-            font-size: 1rem;
+            background: #fafafa;
         }
 
         .config-row {
             display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 0.75rem;
         }
 
         .config-row label {
-            font-size: 0.9rem;
-            color: #bdc3c7;
-            font-weight: bold;
+            font-weight: 500;
+            color: #555;
+            font-size: 0.85rem;
         }
 
-        select, input[type="text"], input[type="password"], input[type="number"] {
-            padding: 0.5rem;
+        .config-row select,
+        .config-row input {
+            width: 180px;
+            padding: 0.4rem;
+            border: 1px solid #ddd;
             border-radius: 4px;
-            border: 1px solid #bdc3c7;
-            font-size: 0.9rem;
-            background-color: white;
+            font-size: 0.85rem;
+        }
+
+        .test-button {
+            padding: 0.5rem 1rem;
+            background: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+
+        .test-button:hover {
+            background: #138496;
         }
 
         .api-status {
-            padding: 0.5rem;
-            border-radius: 4px;
-            margin-top: 0.5rem;
-            font-size: 0.85rem;
-            text-align: center;
+            font-size: 0.8rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-weight: 500;
         }
 
-        .api-status.connected {
-            background-color: #d4edda;
+        .connected {
+            background: #d4edda;
             color: #155724;
-            border: 1px solid #c3e6cb;
         }
 
-        .api-status.disconnected {
-            background-color: #f8d7da;
+        .disconnected {
+            background: #f8d7da;
             color: #721c24;
-            border: 1px solid #f5c6cb;
         }
 
-        .api-status.testing {
-            background-color: #fff3cd;
+        .testing {
+            background: #fff3cd;
             color: #856404;
-            border: 1px solid #ffeaa7;
         }
 
-        /* Controls */
         .controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            flex-wrap: wrap;
-            margin-top: 1rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
         }
 
         .upload-area {
-            border: 2px dashed #bdc3c7;
+            border: 2px dashed #ccc;
             border-radius: 8px;
-            padding: 1rem;
-            background-color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            min-width: 200px;
+            padding: 2rem;
             text-align: center;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: border-color 0.3s;
         }
 
         .upload-area:hover {
-            border-color: #3498db;
-            background-color: #ecf0f1;
+            border-color: #667eea;
         }
 
         .upload-area.dragover {
-            border-color: #2ecc71;
-            background-color: #e8f8f5;
+            border-color: #667eea;
+            background-color: #f0f4ff;
         }
 
-        button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
+        .upload-area input {
+            display: none;
+        }
+
+        .mode-selection {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .mode-button {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            background: white;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.9rem;
-            transition: background-color 0.3s ease;
+            font-size: 0.85rem;
+            text-align: center;
+            transition: all 0.2s;
         }
 
-        button:hover {
-            background-color: #2980b9;
-        }
-
-        button:disabled {
-            background-color: #bdc3c7;
-            cursor: not-allowed;
+        .mode-button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
         }
 
         .ai-button {
-            background-color: #9b59b6;
-        }
-
-        .ai-button:hover {
-            background-color: #8e44ad;
-        }
-
-        /* Main Content Layout */
-        .main-content {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        .sidebar {
-            width: 320px;
-            background-color: white;
-            border-right: 1px solid #ddd;
-            padding: 1rem;
-            overflow-y: auto;
-        }
-
-        .reference-list {
-            flex: 1;
-            padding: 1rem;
-            overflow-y: auto;
-            background-color: white;
-        }
-
-        /* Abstract Navigator */
-        .abstract-navigator {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-
-        .navigator-header {
-            background-color: #f8f9fa;
-            padding: 1rem;
-            border-bottom: 1px solid #dee2e6;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .navigator-controls {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-        }
-
-        .nav-button {
-            background-color: #6c757d;
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: background-color 0.3s ease;
-        }
-
-        .nav-button:hover {
-            background-color: #5a6268;
-        }
-
-        .nav-button:disabled {
-            background-color: #dee2e6;
-            color: #6c757d;
-            cursor: not-allowed;
-        }
-
-        .abstract-counter {
-            font-weight: bold;
-            color: #495057;
-            font-size: 0.9rem;
-        }
-
-        .filter-tabs {
-            display: flex;
-            gap: 0.25rem;
-            margin-left: 1rem;
-        }
-
-        .filter-tab {
-            background-color: #e9ecef;
-            color: #495057;
-            border: none;
-            padding: 0.4rem 0.8rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            transition: all 0.3s ease;
-        }
-
-        .filter-tab.active {
-            background-color: #007bff;
-            color: white;
-        }
-
-        .filter-tab:hover {
-            background-color: #0056b3;
-            color: white;
-        }
-
-        .abstract-viewer {
-            flex: 1;
-            padding: 1.5rem;
-            overflow-y: auto;
-        }
-
-        .abstract-card {
-            background-color: white;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .abstract-header {
-            background-color: #f8f9fa;
-            padding: 1rem;
-            border-bottom: 1px solid #dee2e6;
-            position: relative;
-        }
-
-        .abstract-title {
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 0.5rem;
-            line-height: 1.4;
-        }
-
-        .abstract-meta {
-            color: #6c757d;
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .abstract-status {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .status-badge.include {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .status-badge.exclude {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .status-badge.conflict {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-
-        .status-badge.pending {
-            background-color: #e2e3e5;
-            color: #383d41;
-            border: 1px solid #d1ecf1;
-        }
-
-        .confidence-score {
-            background-color: #e9ecef;
-            color: #495057;
-            padding: 0.25rem 0.5rem;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: bold;
-        }
-
-        .abstract-content {
-            padding: 1.5rem;
-        }
-
-        .abstract-text {
-            background-color: #f8f9fa;
-            padding: 1rem;
             border-radius: 6px;
-            line-height: 1.6;
-            color: #495057;
-            margin-bottom: 1.5rem;
-            border-left: 4px solid #007bff;
-        }
-
-        .ai-evaluation {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            margin-top: 1rem;
-        }
-
-        .ai-panel {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            padding: 1rem;
-        }
-
-        .ai-panel h4 {
-            color: #495057;
-            margin-bottom: 0.75rem;
-            font-size: 0.95rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .ai-decision {
-            font-weight: bold;
-            padding: 0.5rem;
-            border-radius: 4px;
-            text-align: center;
-            margin-bottom: 0.75rem;
-            font-size: 0.9rem;
-        }
-
-        .ai-decision.include {
-            background-color: #d4edda;
-            color: #155724;
-        }
-
-        .ai-decision.exclude {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-
-        .ai-reasoning {
-            font-size: 0.85rem;
-            color: #6c757d;
-            line-height: 1.4;
-            background-color: white;
-            padding: 0.75rem;
-            border-radius: 4px;
-            border: 1px solid #e9ecef;
-        }
-
-        .pico-scores {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.5rem;
-            margin-top: 0.75rem;
-        }
-
-        .pico-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.25rem 0.5rem;
-            background-color: white;
-            border-radius: 4px;
-            font-size: 0.8rem;
-        }
-
-        .pico-score {
-            font-weight: bold;
-            color: #495057;
-        }
-
-        .study-info {
-            background-color: #e9ecef;
-            padding: 0.75rem;
-            border-radius: 4px;
-            margin-top: 0.75rem;
-            font-size: 0.85rem;
-        }
-
-        .study-info strong {
-            color: #495057;
-        }
-
-        .no-evaluation {
-            text-align: center;
-            color: #6c757d;
-            padding: 2rem;
-            font-style: italic;
-        }
-
-        /* Metrics Panel Enhancement */
-        .metrics-panel {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 0.75rem;
-        }
-
-        .metric-item {
-            text-align: center;
-            padding: 0.75rem;
-            background-color: white;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-        }
-
-        .metric-value {
-            font-size: 1.25rem;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: #6c757d;
-            margin-top: 0.25rem;
-        }
-
-        .progress-metrics {
-            margin-top: 1rem;
-            padding: 0.75rem;
-            background-color: white;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-        }
-
-        .progress-bar-container {
-            margin: 0.5rem 0;
-        }
-
-        .progress-label {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.8rem;
-            color: #6c757d;
-            margin-bottom: 0.25rem;
-        }
-
-        .progress-bar-bg {
-            height: 8px;
-            background-color: #e9ecef;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            transition: width 0.3s ease;
-            border-radius: 4px;
-        }
-
-        .progress-bar-fill.include {
-            background-color: #28a745;
-        }
-
-        .progress-bar-fill.exclude {
-            background-color: #dc3545;
-        }
-
-        .progress-bar-fill.conflict {
-            background-color: #ffc107;
-        }
-
-        .progress-bar-fill.processed {
-            background-color: #007bff;
-        }
-
-        /* Advanced Search Interface */
-        .search-panel {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .search-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .search-toggle {
-            background-color: #6c757d;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: background-color 0.3s ease;
-        }
-
-        .search-toggle:hover {
-            background-color: #5a6268;
-        }
-
-        .search-toggle.active {
-            background-color: #007bff;
-        }
-
-        .search-form {
-            display: none;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        .search-form.active {
-            display: grid;
-        }
-
-        .search-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .search-group label {
-            font-weight: 500;
-            color: #495057;
-            margin-bottom: 0.25rem;
-            font-size: 0.9rem;
-        }
-
-        .search-input {
-            padding: 0.5rem;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            transition: border-color 0.3s ease;
-        }
-
-        .search-input:focus {
-            border-color: #007bff;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-        }
-
-        .search-controls {
-            grid-column: span 2;
-            display: flex;
-            gap: 0.5rem;
-            justify-content: flex-end;
-            margin-top: 0.5rem;
-        }
-
-        .search-btn {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: background-color 0.3s ease;
-        }
-
-        .search-btn:hover {
-            background-color: #0056b3;
-        }
-
-        .search-btn.clear {
-            background-color: #6c757d;
-        }
-
-        .search-btn.clear:hover {
-            background-color: #5a6268;
-        }
-
-        .search-results-info {
-            background-color: #e7f3ff;
-            border: 1px solid #b8daff;
-            border-radius: 4px;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
-            font-size: 0.9rem;
-            color: #0c5460;
-        }
-
-        .search-results-info.no-results {
-            background-color: #fff3cd;
-            border-color: #ffeaa7;
-            color: #856404;
-        }
-
-        .search-highlight {
-            background-color: #fff3cd;
-            padding: 0.1rem 0.2rem;
-            border-radius: 2px;
-            font-weight: 500;
-        }
-
-        .filter-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .filter-chip {
-            background-color: #e9ecef;
-            color: #495057;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .filter-chip.active {
-            background-color: #007bff;
-            color: white;
-        }
-
-        .filter-chip .remove {
-            background: none;
-            border: none;
-            color: inherit;
             cursor: pointer;
             font-size: 1rem;
-            line-height: 1;
-            padding: 0;
-            margin-left: 0.25rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            transition: transform 0.2s;
         }
 
-        .sorting-controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            margin-bottom: 1rem;
+        .ai-button:hover:not(:disabled) {
+            transform: translateY(-1px);
         }
 
-        .sort-group {
+        .ai-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .button-row {
             display: flex;
+            gap: 0.5rem;
+        }
+
+        .button-row button {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .button-row button:hover:not(:disabled) {
+            background: #f8f9fa;
+        }
+
+        .button-row button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         /* Citations Section */
@@ -2496,507 +1469,393 @@ HTML_CONTENT = """
         .export-controls select,
         .export-controls input[type="checkbox"] {
             margin-left: 0.5rem;
-            align-items: center;
-            gap: 0.5rem;
         }
 
-        .sort-select {
-            padding: 0.4rem;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 0.9rem;
-        }
-
-        .sort-direction {
-            background-color: #6c757d;
-            color: white;
-            border: none;
-            padding: 0.4rem 0.6rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
-        }
-
-        .sort-direction:hover {
-            background-color: #5a6268;
-        }
-
-        .sort-direction.desc {
-            background-color: #007bff;
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-            .ai-evaluation {
-                grid-template-columns: 1fr;
-            }
-            
-            .navigator-header {
-                flex-direction: column;
-                gap: 0.5rem;
-                align-items: stretch;
-            }
-            
-            .navigator-controls {
-                justify-content: space-between;
-            }
-            
-            .filter-tabs {
-                margin-left: 0;
-                justify-content: center;
-            }
-            
-            .pico-scores {
-                grid-template-columns: 1fr;
-            }
-
-            .search-form {
-                grid-template-columns: 1fr;
-            }
-
-            .search-controls {
-                grid-column: span 1;
-            }
-
-            .sorting-controls {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 0.5rem;
-            }
-        }
-
-        /* Reference Display */
-        .reference {
-            border: 1px solid #ddd;
-            margin-bottom: 1rem;
-            border-radius: 8px;
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
+        }
+
+        .sidebar {
+            background: white;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .progress-container {
+            margin-bottom: 1rem;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .reference-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: #fafafa;
+        }
+
+        .no-references {
+            text-align: center;
+            color: #999;
+            padding: 3rem;
+            font-style: italic;
+        }
+
+        .reference {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
         }
 
         .reference:hover {
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .reference.selected {
-            border-color: #3498db;
-            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-        }
-
-        .relevance-indicator {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            transition: all 0.3s ease;
-        }
-
-        .relevance-indicator.high {
-            background: linear-gradient(180deg, #28a745 0%, #20c997 100%);
-        }
-
-        .relevance-indicator.medium {
-            background: linear-gradient(180deg, #ffc107 0%, #fd7e14 100%);
-        }
-
-        .relevance-indicator.low {
-            background: linear-gradient(180deg, #dc3545 0%, #c82333 100%);
-        }
-
         .reference-header {
             padding: 1rem;
-            padding-left: 2rem;
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #ddd;
-            position: relative;
+            cursor: pointer;
         }
 
         .reference-title {
-            font-weight: bold;
-            font-size: 1rem;
+            font-weight: 600;
+            color: #333;
             margin-bottom: 0.5rem;
-            color: #2c3e50;
+            line-height: 1.4;
         }
 
         .reference-authors {
-            color: #6c757d;
+            color: #666;
             font-size: 0.9rem;
             margin-bottom: 0.25rem;
         }
 
         .reference-journal {
-            color: #6c757d;
+            color: #888;
             font-size: 0.85rem;
         }
 
         .llm-status {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
             display: flex;
             gap: 0.5rem;
+            margin-bottom: 0.5rem;
         }
 
         .llm-badge {
-            background-color: rgba(155, 89, 182, 0.1);
-            color: #8e44ad;
-            padding: 0.25rem 0.5rem;
+            padding: 0.2rem 0.5rem;
             border-radius: 12px;
             font-size: 0.75rem;
-            font-weight: bold;
+            font-weight: 500;
         }
 
         .llm-badge.processing {
-            background-color: rgba(241, 196, 15, 0.1);
-            color: #f39c12;
-            animation: pulse 1.5s ease-in-out infinite;
+            background: #fff3cd;
+            color: #856404;
         }
 
         .llm-badge.include {
-            background-color: rgba(46, 204, 113, 0.1);
-            color: #27ae60;
-        }
-
-        .llm-badge.exclude {
-            background-color: rgba(231, 76, 60, 0.1);
-            color: #e74c3c;
-        }
-
-        .llm-badge.conflict {
-            background-color: rgba(243, 156, 18, 0.1);
-            color: #f39c12;
-        }
-
-        .llm-analysis {
-            background-color: #f8f9ff;
-            border-top: 1px solid #ddd;
-            padding: 1rem;
-            display: none;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        .llm-result {
-            background-color: white;
-            padding: 0.75rem;
-            border-radius: 6px;
-            border: 1px solid #e9ecef;
-        }
-
-        .llm-result h5 {
-            color: #495057;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .decision-summary {
-            font-weight: bold;
-            padding: 0.5rem;
-            border-radius: 4px;
-            text-align: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .decision-summary.include {
-            background-color: #d4edda;
+            background: #d4edda;
             color: #155724;
         }
 
-        .decision-summary.exclude {
-            background-color: #f8d7da;
+        .llm-badge.exclude {
+            background: #f8d7da;
             color: #721c24;
         }
 
-        .reasoning-text {
-            font-size: 0.85rem;
-            color: #6c757d;
-            line-height: 1.4;
+        .llm-badge.conflict {
+            background: #ffeaa7;
+            color: #6c5ce7;
         }
 
-        /* Stats and Processing */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .stat-item {
-            text-align: center;
+        .llm-analysis {
+            display: none;
             padding: 1rem;
-            background-color: #f8f9fa;
-            border-radius: 6px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
         }
 
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #2c3e50;
+        .llm-analysis.expanded {
+            display: block;
         }
 
-        .stat-label {
+        .provider-hint {
             font-size: 0.8rem;
             color: #6c757d;
-            margin-top: 0.25rem;
-        }
-
-        .processing-queue {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .processing-queue h4 {
-            color: #495057;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .queue-item {
-            background-color: white;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
+            margin-top: 0.5rem;
             padding: 0.5rem;
-            margin-bottom: 0.5rem;
-            font-size: 0.85rem;
+            background: #f8f9fa;
+            border-radius: 4px;
         }
 
-        .no-references {
-            text-align: center;
-            color: #6c757d;
-            padding: 2rem;
-        }
-
-        @keyframes pulse {
-            0%, 60%, 100% { opacity: 0.7; }
-            30% { opacity: 1; }
-        }
-
-        #fileInput { display: none; }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-            .sidebar { width: 100%; }
-            .main-content { flex-direction: column; }
-            .config-grid { grid-template-columns: 1fr; }
-            .pico-grid { grid-template-columns: 1fr; }
-            .criteria-details { grid-template-columns: 1fr; gap: 1rem; }
+        .sort-group {
+            display: flex;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="progress-bar">
-            <div class="progress-fill" id="progressFill" style="width: 0%;">
-                <span class="progress-text">0%</span>
-            </div>
-        </div>
-        
         <h1>Otto-SR: Production LLM Screening Tool v3.0</h1>
-        <div class="subtitle">Advanced systematic review screening with multiple LLM providers</div>
-        
-        <!-- Screening Mode Selector -->
-        <div class="screening-mode-selector">
-            <h3>Screening Mode</h3>
-            <div class="mode-buttons">
-                <button class="mode-button active" onclick="setScreeningMode('single')" id="singleModeBtn">
-                    Single Citation
-                </button>
-                <button class="mode-button" onclick="setScreeningMode('batch')" id="batchModeBtn">
-                    Batch Screening
-                </button>
-                <button class="mode-button" onclick="setScreeningMode('ai-assisted')" id="ai-assistedModeBtn">
-                    AI-Assisted
-                </button>
-            </div>
-        </div>
-        
-        <div class="criteria-section">
-            <h3>Systematic Review Criteria (PICO-TT)</h3>
-            
-            <div class="pico-grid">
-                <div class="pico-item">
-                    <label>Population (P):</label>
-                    <textarea id="population" placeholder="e.g., Adults aged 18+ with Type 2 diabetes mellitus, BMI >25 kg/m²">Adults aged 18+ with Type 2 diabetes mellitus, diagnosed within the last 5 years</textarea>
-                </div>
-                <div class="pico-item">
-                    <label>Intervention (I):</label>
-                    <textarea id="intervention" placeholder="e.g., Metformin therapy, lifestyle interventions">Metformin therapy, lifestyle interventions (diet and exercise programs), diabetes education programs</textarea>
-                </div>
-                <div class="pico-item">
-                    <label>Comparison (C):</label>
-                    <textarea id="comparison" placeholder="e.g., Placebo, standard care">Placebo, standard diabetes care, other oral antidiabetic medications, control groups</textarea>
-                </div>
-                <div class="pico-item">
-                    <label>Outcomes (O):</label>
-                    <textarea id="outcome" placeholder="e.g., HbA1c reduction, quality of life">Primary: HbA1c levels, blood glucose control. Secondary: cardiovascular outcomes, quality of life, medication adherence</textarea>
-                </div>
-                <div class="pico-item">
-                    <label>Time Frame (T1):</label>
-                    <textarea id="timeframe" placeholder="e.g., Follow-up ≥3 months">Follow-up duration ≥3 months, intervention duration ≥8 weeks, studies published 2015-2024</textarea>
-                </div>
-                <div class="pico-item">
-                    <label>Study Types (T2):</label>
-                    <textarea id="studyTypes" placeholder="e.g., RCTs, systematic reviews">Randomized controlled trials (RCTs), systematic reviews, meta-analyses, controlled clinical trials</textarea>
-                </div>
-            </div>
-            
-            <div class="criteria-details">
-                <div class="criteria-column">
-                    <h4>✅ Inclusion Criteria</h4>
-                    <div class="criteria-item">
-                        <label>Language:</label>
-                        <input type="text" id="inclusionLanguage" value="English" placeholder="e.g., English, Spanish">
-                    </div>
-                    <div class="criteria-item">
-                        <label>Publication Status:</label>
-                        <input type="text" id="inclusionPublication" value="Peer-reviewed journals" placeholder="e.g., Peer-reviewed studies">
-                    </div>
-                    <div class="criteria-item">
-                        <label>Sample Size:</label>
-                        <input type="text" id="inclusionSampleSize" value="≥20 participants per group" placeholder="e.g., ≥50 participants">
-                    </div>
-                    <div class="criteria-item">
-                        <label>Data Availability:</label>
-                        <input type="text" id="inclusionDataAvailability" value="Sufficient data for analysis" placeholder="e.g., Extractable outcome data">
-                    </div>
-                    <div class="criteria-item">
-                        <label>Other Inclusion:</label>
-                        <textarea id="otherInclusion" placeholder="Additional requirements...">Studies with adequate randomization and blinding procedures. Clear definition of intervention protocols.</textarea>
-                    </div>
-                </div>
+        <p>Advanced systematic review screening with multiple LLM providers and real-time collaboration</p>
+    </div>
+
+    <div class="container">
+        <div class="left-panel">
+            <!-- PICO-TT Criteria Configuration -->
+            <div class="criteria-section">
+                <h3>📋 PICO-TT Criteria Configuration</h3>
                 
-                <div class="criteria-column">
-                    <h4>❌ Exclusion Criteria</h4>
-                    <div class="criteria-item">
-                        <label>Study Types to Exclude:</label>
-                        <input type="text" id="exclusionStudyTypes" value="Case reports, editorials, conference abstracts" placeholder="e.g., Case studies, reviews">
-                    </div>
-                    <div class="criteria-item">
-                        <label>Populations to Exclude:</label>
-                        <input type="text" id="exclusionPopulations" value="Pediatric populations (<18 years), pregnancy" placeholder="e.g., Children, pregnant women">
-                    </div>
-                    <div class="criteria-item">
-                        <label>Interventions to Exclude:</label>
-                        <input type="text" id="exclusionInterventions" value="Surgical interventions, insulin therapy" placeholder="e.g., Invasive procedures">
-                    </div>
-                    <div class="criteria-item">
-                        <label>Languages to Exclude:</label>
-                        <input type="text" id="exclusionLanguages" value="Non-English languages" placeholder="e.g., Other languages">
-                    </div>
-                    <div class="criteria-item">
-                        <label>Other Exclusion:</label>
-                        <textarea id="otherExclusion" placeholder="Additional exclusions...">Animal studies, in vitro studies, studies with significant methodological flaws, duplicate publications</textarea>
-                    </div>
+                <div class="form-group">
+                    <label for="researchQuestion">Research Question</label>
+                    <textarea id="researchQuestion" placeholder="What is your primary research question?"></textarea>
                 </div>
+
+                <div class="form-group">
+                    <label for="population">Population (P)</label>
+                    <input type="text" id="population" placeholder="Target population or participants">
+                </div>
+
+                <div class="form-group">
+                    <label for="intervention">Intervention (I)</label>
+                    <input type="text" id="intervention" placeholder="Intervention or exposure">
+                </div>
+
+                <div class="form-group">
+                    <label for="comparison">Comparison (C)</label>
+                    <input type="text" id="comparison" placeholder="Comparison or control group">
+                </div>
+
+                <div class="form-group">
+                    <label for="outcome">Outcome (O)</label>
+                    <input type="text" id="outcome" placeholder="Primary outcomes of interest">
+                </div>
+
+                <div class="form-group">
+                    <label for="timeframe">Timeframe (T)</label>
+                    <input type="text" id="timeframe" placeholder="Time period or follow-up duration">
+                </div>
+
+                <div class="form-group">
+                    <label for="studyTypes">Study Types (T)</label>
+                    <select id="studyTypes">
+                        <option value="">All study types</option>
+                        <option value="randomized controlled trials">Randomized Controlled Trials</option>
+                        <option value="systematic reviews">Systematic Reviews</option>
+                        <option value="cohort studies">Cohort Studies</option>
+                        <option value="case-control studies">Case-Control Studies</option>
+                        <option value="cross-sectional studies">Cross-Sectional Studies</option>
+                    </select>
+                </div>
+
+                <details>
+                    <summary style="cursor: pointer; margin: 1rem 0; font-weight: 500;">Advanced Inclusion/Exclusion Criteria</summary>
+                    
+                    <div class="form-group">
+                        <label for="inclusionLanguage">Language Requirements</label>
+                        <input type="text" id="inclusionLanguage" placeholder="e.g., English, multilingual">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="inclusionPublication">Publication Types</label>
+                        <input type="text" id="inclusionPublication" placeholder="e.g., peer-reviewed, conference abstracts">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="inclusionSampleSize">Sample Size Requirements</label>
+                        <input type="text" id="inclusionSampleSize" placeholder="e.g., minimum 100 participants">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="inclusionDataAvailability">Data Availability</label>
+                        <input type="text" id="inclusionDataAvailability" placeholder="e.g., full-text available, data extractable">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="otherInclusion">Other Inclusion Criteria</label>
+                        <textarea id="otherInclusion" placeholder="Additional inclusion requirements"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="exclusionStudyTypes">Excluded Study Types</label>
+                        <input type="text" id="exclusionStudyTypes" placeholder="e.g., case reports, editorials">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="exclusionPopulations">Excluded Populations</label>
+                        <input type="text" id="exclusionPopulations" placeholder="e.g., animal studies, pediatric only">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="exclusionInterventions">Excluded Interventions</label>
+                        <input type="text" id="exclusionInterventions" placeholder="e.g., surgical procedures, medications">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="exclusionLanguages">Excluded Languages</label>
+                        <input type="text" id="exclusionLanguages" placeholder="e.g., non-English publications">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="otherExclusion">Other Exclusion Criteria</label>
+                        <textarea id="otherExclusion" placeholder="Additional exclusion requirements"></textarea>
+                    </div>
+                </details>
             </div>
-            
-            <div class="research-question">
-                <h4>Primary Research Question</h4>
-                <textarea id="researchQuestion" placeholder="State your main research question clearly...">In adults with Type 2 diabetes, how effective are metformin and lifestyle interventions compared to standard care in improving glycemic control and cardiovascular outcomes?</textarea>
-            </div>
-        </div>
-        
-        <div class="llm-config">
-            <h3>LLM Configuration</h3>
-            <div class="config-grid">
+
+            <!-- LLM Configuration -->
+            <div class="llm-config">
+                <h4>🤖 Dual LLM Configuration</h4>
+                
+                <!-- AI Model 1 (Conservative) -->
                 <div class="config-section">
-                    <h4>AI Model 1 (Conservative)</h4>
+                    <h5 style="margin-bottom: 0.75rem; color: #d63384;">AI Model 1 - Conservative Screening</h5>
                     <div class="config-row">
                         <label>Provider:</label>
-                        <select id="ai1Provider" onchange="updateProviderModels('ai1')">
-                            <optgroup label="🥇 Recommended for Production">
-                                <option value="openai">OpenAI (Recommended)</option>
-                                <option value="anthropic">Anthropic Claude (Recommended)</option>
-                            </optgroup>
-                            <optgroup label="🏠 Local/Self-Hosted">
-                                <option value="ollama">Ollama (Local)</option>
-                                <option value="openai_compatible">OpenAI-Compatible (Local/Custom)</option>
-                            </optgroup>
-                            <optgroup label="🔥 Fast Inference">
-                                <option value="groq">Groq (Fast Inference)</option>
-                                <option value="together">Together AI</option>
-                                <option value="cohere">Cohere</option>
-                            </optgroup>
-                            <optgroup label="⚙️ Advanced">
-                                <option value="custom">Custom Provider (Advanced)</option>
-                            </optgroup>
+                        <select id="ai1Provider" onchange="updateProviderConfig('ai1')">
+                            <option value="openai">OpenAI (Recommended)</option>
+                            <option value="anthropic">Anthropic Claude</option>
+                            <option value="groq">Groq (Fast)</option>
+                            <option value="together">Together AI</option>
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="openai_compatible">OpenAI-Compatible</option>
+                            <option value="cohere">Cohere</option>
+                            <option value="custom">Custom Provider</option>
                         </select>
                     </div>
                     <div class="config-row">
+                        <label>Model:</label>
+                        <select id="ai1Model">
+                            <option value="gpt-4o">gpt-4o</option>
+                        </select>
+                    </div>
+                    <div class="config-row">
+                        <label>Endpoint:</label>
+                        <input type="text" id="ai1Endpoint" placeholder="API endpoint URL">
+                    </div>
+                    <div class="config-row" style="margin-bottom: 1rem;">
                         <label>API Key:</label>
                         <input type="password" id="ai1ApiKey" placeholder="Enter API key">
                     </div>
-                    <div class="config-row">
-                        <label>Model:</label>
-                        <input type="text" id="ai1Model" value="gpt-4o" placeholder="Model name">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <button class="test-button" onclick="testConnection('ai1')">Test Connection</button>
+                        <span id="ai1Status" class="api-status disconnected">Not Connected</span>
                     </div>
-                    <div class="config-row">
-                        <label>Endpoint:</label>
-                        <input type="text" id="ai1Endpoint" value="https://api.openai.com/v1/chat/completions" placeholder="API endpoint">
-                    </div>
-                    <div class="api-status disconnected" id="ai1Status">Not Connected</div>
-                    <button onclick="testConnection('ai1')" id="testAI1">Test Connection</button>
                 </div>
 
+                <!-- AI Model 2 (Pragmatic) -->
                 <div class="config-section">
-                    <h4>AI Model 2 (Pragmatic)</h4>
+                    <h5 style="margin-bottom: 0.75rem; color: #198754;">AI Model 2 - Pragmatic Screening</h5>
                     <div class="config-row">
                         <label>Provider:</label>
-                        <select id="ai2Provider" onchange="updateProviderModels('ai2')">
-                            <optgroup label="🥇 Recommended for Production">
-                                <option value="openai">OpenAI (Recommended)</option>
-                                <option value="anthropic">Anthropic Claude (Recommended)</option>
-                            </optgroup>
-                            <optgroup label="🏠 Local/Self-Hosted">
-                                <option value="ollama">Ollama (Local)</option>
-                                <option value="openai_compatible">OpenAI-Compatible (Local/Custom)</option>
-                            </optgroup>
-                            <optgroup label="🔥 Fast Inference">
-                                <option value="groq">Groq (Fast Inference)</option>
-                                <option value="together">Together AI</option>
-                                <option value="cohere">Cohere</option>
-                            </optgroup>
-                            <optgroup label="⚙️ Advanced">
-                                <option value="custom">Custom Provider (Advanced)</option>
-                            </optgroup>
+                        <select id="ai2Provider" onchange="updateProviderConfig('ai2')">
+                            <option value="openai">OpenAI (Recommended)</option>
+                            <option value="anthropic">Anthropic Claude</option>
+                            <option value="groq">Groq (Fast)</option>
+                            <option value="together">Together AI</option>
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="openai_compatible">OpenAI-Compatible</option>
+                            <option value="cohere">Cohere</option>
+                            <option value="custom">Custom Provider</option>
                         </select>
                     </div>
                     <div class="config-row">
-                        <label>API Key:</label>
-                        <input type="password" id="ai2ApiKey" placeholder="Enter API key">
-                    </div>
-                    <div class="config-row">
                         <label>Model:</label>
-                        <input type="text" id="ai2Model" value="gpt-4o" placeholder="Model name">
+                        <select id="ai2Model">
+                            <option value="gpt-4o">gpt-4o</option>
+                        </select>
                     </div>
                     <div class="config-row">
                         <label>Endpoint:</label>
-                        <input type="text" id="ai2Endpoint" value="https://api.openai.com/v1/chat/completions" placeholder="API endpoint">
+                        <input type="text" id="ai2Endpoint" placeholder="API endpoint URL">
                     </div>
-                    <div class="api-status disconnected" id="ai2Status">Not Connected</div>
-                    <button onclick="testConnection('ai2')" id="testAI2">Test Connection</button>
+                    <div class="config-row" style="margin-bottom: 1rem;">
+                        <label>API Key:</label>
+                        <input type="password" id="ai2ApiKey" placeholder="Enter API key">
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <button class="test-button" onclick="testConnection('ai2')">Test Connection</button>
+                        <span id="ai2Status" class="api-status disconnected">Not Connected</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Upload and Controls -->
+            <div class="controls">
+                <div class="mode-selection">
+                    <div class="mode-button active" id="singleModeBtn" onclick="setScreeningMode('single')">Single</div>
+                    <div class="mode-button" id="batchModeBtn" onclick="setScreeningMode('batch')">Batch</div>
+                    <div class="mode-button" id="aiModeBtn" onclick="setScreeningMode('ai-assisted')">AI-Assisted</div>
+                </div>
+
+                <div class="upload-area" id="uploadArea">
+                    <div>Drop citation files here or click to browse</div>
+                    <small>Supports: RIS, XML, EndNote (.enw), Mendeley (.bib), Zotero (.rdf, .json)</small>
+                    <input type="file" id="fileInput" accept=".xml,.ris,.enw,.bib,.rdf,.json" multiple />
+                </div>
+
+                <button onclick="startScreening()" id="startBtn" class="ai-button" disabled>Start Screening</button>
+                
+                <div class="button-row">
+                    <button onclick="pauseScreening()" id="pauseBtn" disabled>Pause</button>
+                    <button onclick="exportResults()" id="exportBtn" disabled>Export</button>
                 </div>
             </div>
         </div>
 
-        <div class="controls">
-            <div class="upload-area" id="uploadArea">
-                <div>Drop citation files here or click to browse</div>
-                <small>Supports: RIS, XML, EndNote (.enw), Mendeley (.bib), Zotero (.rdf, .json)</small>
-                <input type="file" id="fileInput" accept=".xml,.ris,.enw,.bib,.rdf,.json" multiple />
-            </div>
-            <button onclick="startScreening()" id="startBtn" class="ai-button" disabled>Start Screening</button>
-            <button onclick="pauseScreening()" id="pauseBtn" disabled>Pause</button>
-            <button onclick="exportResults()" id="exportBtn">Export Results</button>
-        </div>
-
-        <!-- Citations Display Section -->
+        <!-- Citations Section -->
         <div id="citationsSection" class="citations-section" style="display: none;">
             <h3>Uploaded Citations</h3>
             <div class="citations-controls">
@@ -3098,195 +1957,30 @@ HTML_CONTENT = """
         <div class="sidebar">
             <div class="stats-grid">
                 <div class="stat-item">
-                    <div class="stat-value" id="totalCount">0</div>
-                    <div class="stat-label">Total</div>
+                    <span class="stat-number" id="totalCount">0</span>
+                    <div class="stat-label">Total Abstracts</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value" id="processedCount">0</div>
+                    <span class="stat-number" id="processedCount">0</span>
                     <div class="stat-label">Processed</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value" id="conflictCount">0</div>
-                    <div class="stat-label">Conflicts</div>
+                    <span class="stat-number" id="includeCount">0</span>
+                    <div class="stat-label">Included</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value" id="includeCount">0</div>
-                    <div class="stat-label">Included</div>
+                    <span class="stat-number" id="conflictCount">0</span>
+                    <div class="stat-label">Conflicts</div>
                 </div>
             </div>
             
-            <div class="processing-queue">
-                <h4>Processing Queue</h4>
-                <div id="queueList">
-                    <div class="queue-item">No items in queue</div>
+            <div class="progress-container">
+                <div class="progress-label">
+                    <span>Processing Progress</span>
+                    <span id="progressText">0%</span>
                 </div>
-            </div>
-
-            <!-- Advanced Search Panel -->
-            <div class="search-panel" id="searchPanel" style="display: none;">
-                <div class="search-header">
-                    <h4 style="color: #2c3e50; margin: 0;">Advanced Search & Filtering</h4>
-                    <button class="search-toggle" id="searchToggle" onclick="toggleSearch()">🔍 Advanced Search</button>
-                </div>
-                
-                <div class="search-form" id="searchForm">
-                    <div class="search-group">
-                        <label for="searchTitle">Title:</label>
-                        <input type="text" id="searchTitle" class="search-input" placeholder="Search by title...">
-                    </div>
-                    
-                    <div class="search-group">
-                        <label for="searchAuthors">Authors:</label>
-                        <input type="text" id="searchAuthors" class="search-input" placeholder="Search by authors...">
-                    </div>
-                    
-                    <div class="search-group">
-                        <label for="searchJournal">Journal:</label>
-                        <input type="text" id="searchJournal" class="search-input" placeholder="Search by journal...">
-                    </div>
-                    
-                    <div class="search-group">
-                        <label for="searchYear">Publication Year:</label>
-                        <input type="text" id="searchYear" class="search-input" placeholder="e.g. 2020-2024 or 2023">
-                    </div>
-                    
-                    <div class="search-group">
-                        <label for="searchKeywords">Keywords:</label>
-                        <input type="text" id="searchKeywords" class="search-input" placeholder="Search by keywords...">
-                    </div>
-                    
-                    <div class="search-group">
-                        <label for="searchAbstract">Abstract Content:</label>
-                        <input type="text" id="searchAbstract" class="search-input" placeholder="Search within abstracts...">
-                    </div>
-                    
-                    <div class="search-controls">
-                        <button class="search-btn clear" onclick="clearSearch()">Clear All</button>
-                        <button class="search-btn" onclick="performSearch()">Search</button>
-                    </div>
-                </div>
-
-                <!-- Active Filter Chips -->
-                <div class="filter-chips" id="filterChips" style="display: none;"></div>
-
-                <!-- Search Results Info -->
-                <div class="search-results-info" id="searchResultsInfo" style="display: none;"></div>
-
-                <!-- Sorting Controls -->
-                <div class="sorting-controls" id="sortingControls" style="display: none;">
-                    <div class="sort-group">
-                        <label for="sortBy">Sort by:</label>
-                        <select id="sortBy" class="sort-select" onchange="applySorting()">
-                            <option value="relevance">Relevance</option>
-                            <option value="title">Title</option>
-                            <option value="authors">Authors</option>
-                            <option value="year">Year</option>
-                            <option value="journal">Journal</option>
-                            <option value="decision">AI Decision</option>
-                            <option value="confidence">Confidence Score</option>
-                        </select>
-                    </div>
-                    
-                    <button class="sort-direction" id="sortDirection" onclick="toggleSortDirection()">▲ Ascending</button>
-                </div>
-            </div>
-
-            <!-- Enhanced Metrics Panel -->
-            <div class="metrics-panel" id="metricsPanel" style="display: none;">
-                <h4 style="margin-bottom: 1rem; color: #2c3e50;">Detailed Screening Metrics</h4>
-                <div class="metrics-grid">
-                    <div class="metric-item">
-                        <div class="metric-value" id="totalAbstracts">0</div>
-                        <div class="metric-label">Total Abstracts</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-value" id="processedAbstracts">0</div>
-                        <div class="metric-label">Processed</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-value" id="includedAbstracts">0</div>
-                        <div class="metric-label">Included</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-value" id="excludedAbstracts">0</div>
-                        <div class="metric-label">Excluded</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-value" id="conflictAbstracts">0</div>
-                        <div class="metric-label">Conflicts</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-value" id="inclusionRate">0%</div>
-                        <div class="metric-label">Inclusion Rate</div>
-                    </div>
-                </div>
-                
-                <div class="progress-metrics">
-                    <div class="progress-bar-container">
-                        <div class="progress-label">
-                            <span>Processing Progress</span>
-                            <span id="processingPercentage">0%</span>
-                        </div>
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fill processed" id="processingProgressBar" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="progress-bar-container">
-                        <div class="progress-label">
-                            <span>Inclusion Distribution</span>
-                            <span id="inclusionPercentage">0%</span>
-                        </div>
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fill include" id="inclusionProgressBar" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="progress-bar-container">
-                        <div class="progress-label">
-                            <span>Exclusion Distribution</span>
-                            <span id="exclusionPercentage">0%</span>
-                        </div>
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fill exclude" id="exclusionProgressBar" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="progress-bar-container">
-                        <div class="progress-label">
-                            <span>Conflicts</span>
-                            <span id="conflictPercentage">0%</span>
-                        </div>
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fill conflict" id="conflictProgressBar" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Abstract Navigator -->
-            <div class="abstract-navigator" id="abstractNavigator" style="display: none;">
-                <div class="navigator-header">
-                    <div class="navigator-controls">
-                        <button class="nav-button" id="prevButton" onclick="navigateAbstract(-1)">◀ Previous</button>
-                        <span class="abstract-counter" id="abstractCounter">0 / 0</span>
-                        <button class="nav-button" id="nextButton" onclick="navigateAbstract(1)">Next ▶</button>
-                    </div>
-                    
-                    <div class="filter-tabs">
-                        <button class="filter-tab active" data-filter="all" onclick="setFilter('all')">All</button>
-                        <button class="filter-tab" data-filter="include" onclick="setFilter('include')">Included</button>
-                        <button class="filter-tab" data-filter="exclude" onclick="setFilter('exclude')">Excluded</button>
-                        <button class="filter-tab" data-filter="conflict" onclick="setFilter('conflict')">Conflicts</button>
-                        <button class="filter-tab" data-filter="pending" onclick="setFilter('pending')">Pending</button>
-                    </div>
-                </div>
-                
-                <div class="abstract-viewer" id="abstractViewer">
-                    <div class="no-evaluation">
-                        <p>No abstracts available for review.</p>
-                        <p>Upload citations and complete screening to see results here.</p>
-                    </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
                 </div>
             </div>
         </div>
@@ -3321,43 +2015,49 @@ HTML_CONTENT = """
             successRate: 0,
             conflictCount: 0
         };
-        
-        // Abstract Navigator Variables
-        let currentAbstractIndex = 0;
-        let filteredReferences = [];
-        let currentFilter = 'all';
-        
-        // Search and Filtering Variables
-        let searchCriteria = {};
-        let activeFilters = [];
-        let sortBy = 'relevance';
-        let sortDirection = 'asc';
-        let searchResults = [];
-        let originalReferences = [];
 
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('fileInput').addEventListener('change', handleFileUpload);
             setupDragAndDrop();
-            loadProviderConfigurations();
+            loadProviders();
+            
+            // Initialize metrics display
+            updateMetricsDisplay();
         });
 
         // --- Provider Management ---
-        async function loadProviderConfigurations() {
+        async function loadProviders() {
             try {
                 const response = await fetch('/api/providers');
                 const data = await response.json();
                 providerConfigs = data.providers;
                 
-                // Initialize provider dropdowns and default values
-                updateProviderModels('ai1');
-                updateProviderModels('ai2');
+                // Update provider dropdowns
+                updateProviderOptions('ai1');
+                updateProviderOptions('ai2');
+                
+                // Set initial configurations
+                updateProviderConfig('ai1');
+                updateProviderConfig('ai2');
             } catch (error) {
-                console.error('Error loading provider configurations:', error);
+                console.error('Error loading providers:', error);
             }
         }
 
-        function updateProviderModels(aiModel) {
+        function updateProviderOptions(aiModel) {
+            const select = document.getElementById(`${aiModel}Provider`);
+            select.innerHTML = '';
+            
+            Object.entries(providerConfigs).forEach(([key, config]) => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = config.display_name;
+                select.appendChild(option);
+            });
+        }
+
+        function updateProviderConfig(aiModel) {
             const providerSelect = document.getElementById(`${aiModel}Provider`);
             const modelSelect = document.getElementById(`${aiModel}Model`);
             const endpointInput = document.getElementById(`${aiModel}Endpoint`);
@@ -3368,7 +2068,7 @@ HTML_CONTENT = """
             
             if (!providerConfig) return;
             
-            // Update model options
+            // Update models
             modelSelect.innerHTML = '';
             providerConfig.models.forEach(model => {
                 const option = document.createElement('option');
@@ -3380,23 +2080,10 @@ HTML_CONTENT = """
                 modelSelect.appendChild(option);
             });
             
-            // Update endpoint if provider has default
-            if (providerConfig.default_endpoint) {
-                endpointInput.value = providerConfig.default_endpoint;
-            } else {
-                // Set default endpoints for known providers
-                const defaultEndpoints = {
-                    'openai': 'https://api.openai.com/v1/chat/completions',
-                    'anthropic': 'https://api.anthropic.com/v1/messages',
-                    'cohere': 'https://api.cohere.ai/v1/chat',
-                    'groq': 'https://api.groq.com/openai/v1',
-                    'together': 'https://api.together.xyz/v1',
-                    'custom': 'https://your-api-endpoint.com/v1'
-                };
-                endpointInput.value = defaultEndpoints[selectedProvider] || '';
-            }
+            // Update endpoint
+            endpointInput.value = providerConfig.default_endpoint || '';
             
-            // Add provider-specific hints
+            // Add provider hints
             const configSection = endpointInput.closest('.config-section');
             let hintElement = configSection.querySelector('.provider-hint');
             if (!hintElement) {
@@ -3704,114 +2391,6 @@ HTML_CONTENT = """
             addActivityLog(`Exported results (${format})`, 'info');
         }
 
-        // --- Legacy Citation Display (backward compatibility) ---
-        function displayCitationCarousel(citations) {
-            const container = document.getElementById('referencesContainer');
-            if (!container) return;
-
-            // Create carousel header
-            const header = document.createElement('div');
-            header.className = 'citation-carousel-header';
-            header.innerHTML = `
-                <h3>📚 Uploaded Citations (${citations.length})</h3>
-                <p>Your citations are ready for screening. Review them below:</p>
-            `;
-            header.style.cssText = 'margin-bottom: 1rem; padding: 1rem; background: #e8f5e8; border-radius: 8px; border-left: 4px solid #28a745;';
-
-            // Create carousel container
-            const carousel = document.createElement('div');
-            carousel.className = 'citation-carousel';
-            carousel.style.cssText = 'display: flex; gap: 1rem; overflow-x: auto; padding: 1rem 0; scroll-behavior: smooth;';
-
-            citations.forEach((citation, index) => {
-                const card = document.createElement('div');
-                card.className = 'citation-card';
-                card.style.cssText = `
-                    min-width: 320px; max-width: 380px; padding: 1rem; border: 1px solid #ddd; 
-                    border-radius: 8px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    transition: transform 0.2s, box-shadow 0.2s;
-                `;
-
-                // Truncate long titles and abstracts for display
-                const truncatedTitle = citation.title.length > 80 ? 
-                    citation.title.substring(0, 80) + '...' : citation.title;
-                const truncatedAbstract = citation.abstract.length > 150 ? 
-                    citation.abstract.substring(0, 150) + '...' : citation.abstract;
-
-                card.innerHTML = `
-                    <div class="citation-header" style="margin-bottom: 0.75rem;">
-                        <h4 style="margin: 0 0 0.5rem 0; color: #2c3e50; font-size: 1rem; line-height: 1.3;">${truncatedTitle}</h4>
-                        <div style="font-size: 0.85rem; color: #6c757d;">
-                            <span><strong>Authors:</strong> ${citation.authors || 'Unknown'}</span><br>
-                            <span><strong>Journal:</strong> ${citation.journal || 'Unknown'}</span>
-                            <span style="margin-left: 1rem;"><strong>Year:</strong> ${citation.year || 'N/A'}</span>
-                        </div>
-                    </div>
-                    <div class="citation-abstract" style="margin-bottom: 0.75rem;">
-                        <p style="font-size: 0.9rem; color: #495057; margin: 0; line-height: 1.4;">${truncatedAbstract}</p>
-                    </div>
-                    <div class="citation-footer" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #6c757d;">
-                        <span class="relevance-score">Relevance: ${Math.round((citation.relevance_score || 0.5) * 100)}%</span>
-                        <span class="citation-status" style="background: #28a745; color: white; padding: 2px 8px; border-radius: 12px; margin-left: auto;">Ready</span>
-                    </div>
-                `;
-
-                // Add hover effects
-                card.addEventListener('mouseenter', () => {
-                    card.style.transform = 'translateY(-2px)';
-                    card.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
-                });
-                card.addEventListener('mouseleave', () => {
-                    card.style.transform = 'translateY(0)';
-                    card.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                });
-
-                carousel.appendChild(card);
-            });
-
-            // Clear container and add new content
-            container.innerHTML = '';
-            container.appendChild(header);
-            container.appendChild(carousel);
-
-            // Add scroll buttons if needed
-            if (citations.length > 3) {
-                const scrollControls = document.createElement('div');
-                scrollControls.className = 'carousel-controls';
-                scrollControls.style.cssText = 'text-align: center; margin-top: 1rem;';
-                scrollControls.innerHTML = `
-                    <button onclick="scrollCarousel('left')" style="margin-right: 0.5rem; padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">← Previous</button>
-                    <button onclick="scrollCarousel('right')" style="padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Next →</button>
-                `;
-                container.appendChild(scrollControls);
-            }
-        }
-
-        function scrollCarousel(direction) {
-            const carousel = document.querySelector('.citation-carousel');
-            if (!carousel) return;
-            
-            const scrollAmount = 340; // Width of one card plus gap
-            if (direction === 'left') {
-                carousel.scrollLeft -= scrollAmount;
-            } else {
-                carousel.scrollLeft += scrollAmount;
-            }
-        }
-
-        async function loadReferences() {
-            if (!currentProject) return;
-            
-            try {
-                const response = await fetch(`/api/projects/${currentProject}/citations`);
-                if (response.ok) {
-                    references = await response.json();
-                }
-            } catch (error) {
-                console.error('Error loading references:', error);
-            }
-        }
-
         // --- LLM Configuration ---
         async function testConnection(aiModel) {
             const statusElement = document.getElementById(`${aiModel}Status`);
@@ -3829,7 +2408,7 @@ HTML_CONTENT = """
                 const response = await fetch('/api/test-llm', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ai_model: aiModel, config: config })
+                    body: JSON.stringify({ config })
                 });
 
                 const result = await response.json();
@@ -3936,10 +2515,9 @@ HTML_CONTENT = """
             const total = references.length;
             const processed = references.filter(r => r.status === 'completed' || r.status === 'error').length;
             const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
-
-            const progressFill = document.getElementById('progressFill');
-            progressFill.style.width = `${percentage}%`;
-            progressFill.querySelector('.progress-text').textContent = `${percentage}%`;
+            
+            document.getElementById('progressFill').style.width = `${percentage}%`;
+            document.getElementById('progressText').textContent = `${percentage}%`;
         }
 
         function updateReferenceList() {
@@ -3947,16 +2525,7 @@ HTML_CONTENT = """
             
             if (!references.length) {
                 listElement.innerHTML = '<div class="no-references">Configure LLM connections and upload files to begin screening</div>';
-                // Show search panel and navigator when we have references
-                updateSearchInterface();
-                updateAbstractNavigator();
-                updateMetricsPanel();
                 return;
-            }
-            
-            // Store original references for search
-            if (originalReferences.length === 0) {
-                originalReferences = [...references];
             }
 
             const referencesHtml = references.map(ref => {
@@ -3973,7 +2542,6 @@ HTML_CONTENT = """
 
                 return `
                     <div class="reference" onclick="toggleAnalysis('${ref.id}')">
-                        <div class="relevance-indicator ${relevanceClass}"></div>
                         <div class="reference-header">
                             <div class="llm-status">${statusBadges}</div>
                             <div class="reference-title">${ref.title}</div>
@@ -3988,50 +2556,56 @@ HTML_CONTENT = """
             }).join('');
 
             listElement.innerHTML = referencesHtml;
-            
-            // Update search interface, abstract navigator and metrics when references change
-            updateSearchInterface();
-            updateAbstractNavigator();
-            updateMetricsPanel();
         }
 
         function renderAnalysisResults(ref) {
-            if (!ref.ai1_result || !ref.ai2_result) return '';
+            let html = '<h4>AI Analysis Results</h4>';
             
-            return `
-                <div class="llm-result">
-                    <h5>Conservative AI</h5>
-                    <div class="decision-summary ${ref.ai1_result.decision}">
-                        ${ref.ai1_result.decision.toUpperCase()} (${ref.ai1_result.confidence}%)
+            if (ref.ai1_result) {
+                html += `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Conservative AI:</strong> ${ref.ai1_result.decision} 
+                        (${ref.ai1_result.confidence}% confidence)
+                        <br><em>${ref.ai1_result.reasoning}</em>
                     </div>
-                    <div class="reasoning-text">${ref.ai1_result.reasoning}</div>
-                </div>
-                <div class="llm-result">
-                    <h5>Pragmatic AI</h5>
-                    <div class="decision-summary ${ref.ai2_result.decision}">
-                        ${ref.ai2_result.decision.toUpperCase()} (${ref.ai2_result.confidence}%)
+                `;
+            }
+            
+            if (ref.ai2_result) {
+                html += `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Pragmatic AI:</strong> ${ref.ai2_result.decision} 
+                        (${ref.ai2_result.confidence}% confidence)
+                        <br><em>${ref.ai2_result.reasoning}</em>
                     </div>
-                    <div class="reasoning-text">${ref.ai2_result.reasoning}</div>
-                </div>
-            `;
+                `;
+            }
+            
+            return html;
         }
 
         function toggleAnalysis(refId) {
-            const analysisEl = document.getElementById(`analysis-${refId}`);
-            if (analysisEl) {
-                analysisEl.style.display = analysisEl.style.display === 'grid' ? 'none' : 'grid';
+            const analysisDiv = document.getElementById(`analysis-${refId}`);
+            if (analysisDiv) {
+                analysisDiv.classList.toggle('expanded');
             }
         }
 
         function updateReferenceStatus(data) {
-            const ref = references.find(r => r.id === data.citation_id);
-            if (ref) {
-                Object.assign(ref, data);
+            const refIndex = references.findIndex(r => r.id === data.citation_id);
+            if (refIndex !== -1) {
+                references[refIndex].status = data.status;
+                if (data.ai1_result) references[refIndex].ai1_result = data.ai1_result;
+                if (data.ai2_result) references[refIndex].ai2_result = data.ai2_result;
+                if (data.final_decision) references[refIndex].final_decision = data.final_decision;
             }
         }
 
         function updateStartButton() {
             const startBtn = document.getElementById('startBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const exportBtn = document.getElementById('exportBtn');
+            
             const ai1Connected = llmConfigs.ai1.connected;
             const ai2Connected = llmConfigs.ai2.connected;
             const hasReferences = references.length > 0;
@@ -4039,16 +2613,22 @@ HTML_CONTENT = """
             if (isProcessing) {
                 startBtn.disabled = true;
                 startBtn.textContent = 'Processing...';
+                pauseBtn.disabled = false;
             } else if (!ai1Connected || !ai2Connected) {
                 startBtn.disabled = true;
                 startBtn.textContent = 'Connect LLMs First';
+                pauseBtn.disabled = true;
             } else if (!hasReferences) {
                 startBtn.disabled = true;
                 startBtn.textContent = 'Upload Studies First';
+                pauseBtn.disabled = true;
             } else {
                 startBtn.disabled = false;
                 startBtn.textContent = `Start ${screeningMode} Screening`;
+                pauseBtn.disabled = true;
             }
+            
+            exportBtn.disabled = !hasReferences;
         }
 
         // --- Utility Functions ---
@@ -4092,821 +2672,187 @@ HTML_CONTENT = """
                 alert('Error exporting results: ' + error.message);
             }
         }
-
-        // --- Abstract Navigator Functions ---
-        function updateAbstractNavigator() {
-            const navigator = document.getElementById('abstractNavigator');
-            const metricsPanel = document.getElementById('metricsPanel');
-            
-            // Show navigator if we have any references
-            if (references.length > 0) {
-                navigator.style.display = 'flex';
-                metricsPanel.style.display = 'block';
-                
-                // Apply current filter
-                applyFilter();
-                
-                // Update navigation controls
-                updateNavigationControls();
-                
-                // Display current abstract
-                displayCurrentAbstract();
-            } else {
-                navigator.style.display = 'none';
-                metricsPanel.style.display = 'none';
-            }
-        }
-
-        function applyFilter() {
-            switch (currentFilter) {
-                case 'include':
-                    filteredReferences = references.filter(ref => ref.final_decision === 'include');
-                    break;
-                case 'exclude':
-                    filteredReferences = references.filter(ref => ref.final_decision === 'exclude');
-                    break;
-                case 'conflict':
-                    filteredReferences = references.filter(ref => ref.final_decision === 'conflict');
-                    break;
-                case 'pending':
-                    filteredReferences = references.filter(ref => !ref.final_decision || ref.status !== 'completed');
-                    break;
-                default:
-                    filteredReferences = [...references];
-            }
-            
-            // Reset index if it's out of bounds
-            if (currentAbstractIndex >= filteredReferences.length) {
-                currentAbstractIndex = 0;
-            }
-        }
-
-        function setFilter(filter) {
-            currentFilter = filter;
-            currentAbstractIndex = 0;
-            
-            // Update filter tab UI
-            document.querySelectorAll('.filter-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
-            
-            // Apply filter and update display
-            applyFilter();
-            updateNavigationControls();
-            displayCurrentAbstract();
-        }
-
-        function navigateAbstract(direction) {
-            if (filteredReferences.length === 0) return;
-            
-            currentAbstractIndex += direction;
-            
-            // Handle wraparound
-            if (currentAbstractIndex < 0) {
-                currentAbstractIndex = filteredReferences.length - 1;
-            } else if (currentAbstractIndex >= filteredReferences.length) {
-                currentAbstractIndex = 0;
-            }
-            
-            updateNavigationControls();
-            displayCurrentAbstract();
-        }
-
-        function updateNavigationControls() {
-            const prevButton = document.getElementById('prevButton');
-            const nextButton = document.getElementById('nextButton');
-            const counter = document.getElementById('abstractCounter');
-            
-            const total = filteredReferences.length;
-            const current = total > 0 ? currentAbstractIndex + 1 : 0;
-            
-            counter.textContent = `${current} / ${total}`;
-            
-            // Enable/disable navigation buttons
-            prevButton.disabled = total === 0;
-            nextButton.disabled = total === 0;
-        }
-
-        function displayCurrentAbstract() {
-            const viewer = document.getElementById('abstractViewer');
-            
-            if (filteredReferences.length === 0) {
-                viewer.innerHTML = `
-                    <div class="no-evaluation">
-                        <p>No abstracts match the current filter: "${currentFilter}"</p>
-                        <p>Try selecting a different filter or complete more screening.</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            const ref = filteredReferences[currentAbstractIndex];
-            viewer.innerHTML = renderAbstractCard(ref);
-        }
-
-        function renderAbstractCard(ref) {
-            const statusClass = getStatusClass(ref);
-            const confidenceScore = getConfidenceScore(ref);
-            
-            return `
-                <div class="abstract-card">
-                    <div class="abstract-header">
-                        <div class="abstract-title">${ref.title || 'Untitled'}</div>
-                        <div class="abstract-meta">
-                            <strong>Authors:</strong> ${ref.authors || 'Unknown authors'}<br>
-                            <strong>Journal:</strong> ${ref.journal || 'Unknown journal'} ${ref.year ? `(${ref.year})` : ''}<br>
-                            ${ref.doi ? `<strong>DOI:</strong> ${ref.doi}<br>` : ''}
-                            ${ref.keywords ? `<strong>Keywords:</strong> ${ref.keywords}<br>` : ''}
-                        </div>
-                        <div class="abstract-status">
-                            <div class="status-badge ${statusClass}">${getStatusText(ref)}</div>
-                            ${confidenceScore ? `<div class="confidence-score">${confidenceScore}% confidence</div>` : ''}
-                        </div>
-                    </div>
-                    
-                    <div class="abstract-content">
-                        <div class="abstract-text">
-                            ${ref.abstract || 'No abstract available'}
-                        </div>
-                        
-                        ${renderAIEvaluation(ref)}
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderAIEvaluation(ref) {
-            if (!ref.ai1_result && !ref.ai2_result) {
-                return `
-                    <div class="no-evaluation">
-                        <p>No AI evaluation available yet.</p>
-                        <p>This abstract is pending screening.</p>
-                    </div>
-                `;
-            }
-            
-            return `
-                <div class="ai-evaluation">
-                    ${ref.ai1_result ? renderAIPanel('Conservative AI', ref.ai1_result) : ''}
-                    ${ref.ai2_result ? renderAIPanel('Pragmatic AI', ref.ai2_result) : ''}
-                </div>
-            `;
-        }
-
-        function renderAIPanel(title, aiResult) {
-            const decision = aiResult.decision || 'unknown';
-            const confidence = aiResult.confidence || 0;
-            const reasoning = aiResult.reasoning || 'No reasoning provided';
-            const picoScores = aiResult.pico_scores || {};
-            const studyDesign = aiResult.study_design || 'Unknown';
-            const qualityAssessment = aiResult.quality_assessment || 'Unknown';
-            const keyFindings = aiResult.key_findings || [];
-            
-            return `
-                <div class="ai-panel">
-                    <h4>${title} <span class="confidence-score">${confidence}%</span></h4>
-                    
-                    <div class="ai-decision ${decision}">
-                        ${decision.toUpperCase()}
-                    </div>
-                    
-                    <div class="ai-reasoning">
-                        ${reasoning}
-                    </div>
-                    
-                    <div class="pico-scores">
-                        <div class="pico-item">
-                            <span>Population:</span>
-                            <span class="pico-score">${(picoScores.population * 100 || 0).toFixed(0)}%</span>
-                        </div>
-                        <div class="pico-item">
-                            <span>Intervention:</span>
-                            <span class="pico-score">${(picoScores.intervention * 100 || 0).toFixed(0)}%</span>
-                        </div>
-                        <div class="pico-item">
-                            <span>Comparison:</span>
-                            <span class="pico-score">${(picoScores.comparison * 100 || 0).toFixed(0)}%</span>
-                        </div>
-                        <div class="pico-item">
-                            <span>Outcome:</span>
-                            <span class="pico-score">${(picoScores.outcome * 100 || 0).toFixed(0)}%</span>
-                        </div>
-                    </div>
-                    
-                    <div class="study-info">
-                        <strong>Study Design:</strong> ${studyDesign}<br>
-                        <strong>Quality Assessment:</strong> ${qualityAssessment}
-                        ${keyFindings.length > 0 ? `<br><strong>Key Findings:</strong> ${keyFindings.join(', ')}` : ''}
-                    </div>
-                </div>
-            `;
-        }
-
-        function getStatusClass(ref) {
-            if (ref.status === 'processing') return 'pending';
-            if (ref.final_decision === 'conflict') return 'conflict';
-            if (ref.final_decision === 'include') return 'include';
-            if (ref.final_decision === 'exclude') return 'exclude';
-            return 'pending';
-        }
-
-        function getStatusText(ref) {
-            if (ref.status === 'processing') return 'Processing';
-            if (ref.final_decision === 'conflict') return 'Conflict';
-            if (ref.final_decision === 'include') return 'Include';
-            if (ref.final_decision === 'exclude') return 'Exclude';
-            return 'Pending';
-        }
-
-        function getConfidenceScore(ref) {
-            if (ref.ai1_result && ref.ai2_result) {
-                return Math.round((ref.ai1_result.confidence + ref.ai2_result.confidence) / 2);
-            } else if (ref.ai1_result) {
-                return ref.ai1_result.confidence;
-            } else if (ref.ai2_result) {
-                return ref.ai2_result.confidence;
-            }
-            return null;
-        }
-
-        function updateMetricsPanel() {
-            if (references.length === 0) {
-                document.getElementById('metricsPanel').style.display = 'none';
-                return;
-            }
-            
-            const total = references.length;
-            const processed = references.filter(r => r.status === 'completed').length;
-            const included = references.filter(r => r.final_decision === 'include').length;
-            const excluded = references.filter(r => r.final_decision === 'exclude').length;
-            const conflicts = references.filter(r => r.final_decision === 'conflict').length;
-            
-            const inclusionRate = processed > 0 ? Math.round((included / processed) * 100) : 0;
-            const processingPercentage = Math.round((processed / total) * 100);
-            const inclusionPercentage = total > 0 ? Math.round((included / total) * 100) : 0;
-            const exclusionPercentage = total > 0 ? Math.round((excluded / total) * 100) : 0;
-            const conflictPercentage = total > 0 ? Math.round((conflicts / total) * 100) : 0;
-            
-            // Update metric values
-            document.getElementById('totalAbstracts').textContent = total;
-            document.getElementById('processedAbstracts').textContent = processed;
-            document.getElementById('includedAbstracts').textContent = included;
-            document.getElementById('excludedAbstracts').textContent = excluded;
-            document.getElementById('conflictAbstracts').textContent = conflicts;
-            document.getElementById('inclusionRate').textContent = `${inclusionRate}%`;
-            
-            // Update progress bars
-            document.getElementById('processingPercentage').textContent = `${processingPercentage}%`;
-            document.getElementById('processingProgressBar').style.width = `${processingPercentage}%`;
-            
-            document.getElementById('inclusionPercentage').textContent = `${inclusionPercentage}%`;
-            document.getElementById('inclusionProgressBar').style.width = `${inclusionPercentage}%`;
-            
-            document.getElementById('exclusionPercentage').textContent = `${exclusionPercentage}%`;
-            document.getElementById('exclusionProgressBar').style.width = `${exclusionPercentage}%`;
-            
-            document.getElementById('conflictPercentage').textContent = `${conflictPercentage}%`;
-            document.getElementById('conflictProgressBar').style.width = `${conflictPercentage}%`;
-        }
-
-        // --- Advanced Search and Filtering Functions ---
-        function updateSearchInterface() {
-            const searchPanel = document.getElementById('searchPanel');
-            const sortingControls = document.getElementById('sortingControls');
-            
-            if (references.length > 0) {
-                searchPanel.style.display = 'block';
-                sortingControls.style.display = 'flex';
-            } else {
-                searchPanel.style.display = 'none';
-                sortingControls.style.display = 'none';
-            }
-        }
-
-        function toggleSearch() {
-            const searchForm = document.getElementById('searchForm');
-            const searchToggle = document.getElementById('searchToggle');
-            
-            if (searchForm.classList.contains('active')) {
-                searchForm.classList.remove('active');
-                searchToggle.classList.remove('active');
-                searchToggle.textContent = '🔍 Advanced Search';
-            } else {
-                searchForm.classList.add('active');
-                searchToggle.classList.add('active');
-                searchToggle.textContent = '✕ Hide Search';
-            }
-        }
-
-        function performSearch() {
-            const criteria = collectSearchCriteria();
-            
-            // Clear previous search if no criteria
-            if (Object.keys(criteria).length === 0) {
-                clearSearch();
-                return;
-            }
-            
-            searchCriteria = criteria;
-            searchResults = filterReferences(originalReferences, criteria);
-            
-            // Update references with search results
-            references = [...searchResults];
-            
-            // Apply sorting
-            applySorting();
-            
-            // Update UI components
-            updateFilterChips();
-            updateSearchResultsInfo();
-            updateReferenceList();
-            updateAbstractNavigator();
-            updateMetricsPanel();
-        }
-
-        function collectSearchCriteria() {
-            const criteria = {};
-            
-            const title = document.getElementById('searchTitle').value.trim();
-            const authors = document.getElementById('searchAuthors').value.trim();
-            const journal = document.getElementById('searchJournal').value.trim();
-            const year = document.getElementById('searchYear').value.trim();
-            const keywords = document.getElementById('searchKeywords').value.trim();
-            const abstract = document.getElementById('searchAbstract').value.trim();
-            
-            if (title) criteria.title = title;
-            if (authors) criteria.authors = authors;
-            if (journal) criteria.journal = journal;
-            if (year) criteria.year = year;
-            if (keywords) criteria.keywords = keywords;
-            if (abstract) criteria.abstract = abstract;
-            
-            return criteria;
-        }
-
-        function filterReferences(refs, criteria) {
-            return refs.filter(ref => {
-                // Title search
-                if (criteria.title && !searchInText(ref.title, criteria.title)) {
-                    return false;
-                }
-                
-                // Authors search
-                if (criteria.authors && !searchInText(ref.authors, criteria.authors)) {
-                    return false;
-                }
-                
-                // Journal search
-                if (criteria.journal && !searchInText(ref.journal, criteria.journal)) {
-                    return false;
-                }
-                
-                // Year search (supports ranges like "2020-2024" or single year "2023")
-                if (criteria.year && !matchYear(ref.year, criteria.year)) {
-                    return false;
-                }
-                
-                // Keywords search
-                if (criteria.keywords && !searchInText(ref.keywords, criteria.keywords)) {
-                    return false;
-                }
-                
-                // Abstract content search
-                if (criteria.abstract && !searchInText(ref.abstract, criteria.abstract)) {
-                    return false;
-                }
-                
-                return true;
-            });
-        }
-
-        function searchInText(text, searchTerm) {
-            if (!text || !searchTerm) return false;
-            return text.toLowerCase().includes(searchTerm.toLowerCase());
-        }
-
-        function matchYear(refYear, searchYear) {
-            if (!refYear || !searchYear) return false;
-            
-            const yearStr = refYear.toString();
-            
-            // Check for range (e.g., "2020-2024")
-            if (searchYear.includes('-')) {
-                const [startYear, endYear] = searchYear.split('-').map(y => parseInt(y.trim()));
-                const year = parseInt(yearStr);
-                return year >= startYear && year <= endYear;
-            }
-            
-            // Single year or partial match
-            return yearStr.includes(searchYear.trim());
-        }
-
-        function highlightSearchTerms(text, searchTerm) {
-            if (!text || !searchTerm) return text;
-            
-            const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&')})`, 'gi');
-            return text.replace(regex, '<span class="search-highlight">$1</span>');
-        }
-
-        function updateFilterChips() {
-            const chipsContainer = document.getElementById('filterChips');
-            
-            if (Object.keys(searchCriteria).length === 0) {
-                chipsContainer.style.display = 'none';
-                return;
-            }
-            
-            chipsContainer.style.display = 'flex';
-            
-            const chips = Object.entries(searchCriteria).map(([key, value]) => {
-                const displayName = {
-                    title: 'Title',
-                    authors: 'Authors',
-                    journal: 'Journal',
-                    year: 'Year',
-                    keywords: 'Keywords',
-                    abstract: 'Abstract'
-                }[key] || key;
-                
-                return `
-                    <div class="filter-chip active">
-                        ${displayName}: ${value}
-                        <button class="remove" onclick="removeFilter('${key}')">&times;</button>
-                    </div>
-                `;
-            }).join('');
-            
-            chipsContainer.innerHTML = chips;
-        }
-
-        function removeFilter(filterKey) {
-            delete searchCriteria[filterKey];
-            document.getElementById(`search${filterKey.charAt(0).toUpperCase() + filterKey.slice(1)}`).value = '';
-            
-            if (Object.keys(searchCriteria).length === 0) {
-                clearSearch();
-            } else {
-                performSearch();
-            }
-        }
-
-        function updateSearchResultsInfo() {
-            const infoElement = document.getElementById('searchResultsInfo');
-            
-            if (Object.keys(searchCriteria).length === 0) {
-                infoElement.style.display = 'none';
-                return;
-            }
-            
-            infoElement.style.display = 'block';
-            
-            const totalRefs = originalReferences.length;
-            const foundRefs = searchResults.length;
-            
-            if (foundRefs === 0) {
-                infoElement.className = 'search-results-info no-results';
-                infoElement.innerHTML = `
-                    No abstracts found matching your search criteria. 
-                    Try adjusting your search terms or clearing some filters.
-                `;
-            } else {
-                infoElement.className = 'search-results-info';
-                infoElement.innerHTML = `
-                    Found ${foundRefs} of ${totalRefs} abstracts matching your search criteria.
-                    ${foundRefs < totalRefs ? 'Use filters or modify your search to refine results.' : ''}
-                `;
-            }
-        }
-
-        function clearSearch() {
-            // Clear search form
-            document.getElementById('searchTitle').value = '';
-            document.getElementById('searchAuthors').value = '';
-            document.getElementById('searchJournal').value = '';
-            document.getElementById('searchYear').value = '';
-            document.getElementById('searchKeywords').value = '';
-            document.getElementById('searchAbstract').value = '';
-            
-            // Reset variables
-            searchCriteria = {};
-            searchResults = [];
-            references = [...originalReferences];
-            
-            // Update UI
-            updateFilterChips();
-            updateSearchResultsInfo();
-            updateReferenceList();
-            updateAbstractNavigator();
-            updateMetricsPanel();
-        }
-
-        function applySorting() {
-            const sortField = document.getElementById('sortBy').value;
-            const isDescending = document.getElementById('sortDirection').classList.contains('desc');
-            
-            references.sort((a, b) => {
-                let valueA, valueB;
-                
-                switch (sortField) {
-                    case 'title':
-                        valueA = (a.title || '').toLowerCase();
-                        valueB = (b.title || '').toLowerCase();
-                        break;
-                    case 'authors':
-                        valueA = (a.authors || '').toLowerCase();
-                        valueB = (b.authors || '').toLowerCase();
-                        break;
-                    case 'year':
-                        valueA = parseInt(a.year) || 0;
-                        valueB = parseInt(b.year) || 0;
-                        break;
-                    case 'journal':
-                        valueA = (a.journal || '').toLowerCase();
-                        valueB = (b.journal || '').toLowerCase();
-                        break;
-                    case 'decision':
-                        valueA = a.final_decision || 'pending';
-                        valueB = b.final_decision || 'pending';
-                        break;
-                    case 'confidence':
-                        valueA = getConfidenceScore(a) || 0;
-                        valueB = getConfidenceScore(b) || 0;
-                        break;
-                    case 'relevance':
-                    default:
-                        valueA = a.relevance_score || 0;
-                        valueB = b.relevance_score || 0;
-                        break;
-                }
-                
-                if (typeof valueA === 'string') {
-                    const comparison = valueA.localeCompare(valueB);
-                    return isDescending ? -comparison : comparison;
-                } else {
-                    const comparison = valueA - valueB;
-                    return isDescending ? -comparison : comparison;
-                }
-            });
-            
-            // Update the reference list and navigator
-            updateReferenceList();
-            updateAbstractNavigator();
-        }
-
-        function toggleSortDirection() {
-            const sortButton = document.getElementById('sortDirection');
-            
-            if (sortButton.classList.contains('desc')) {
-                sortButton.classList.remove('desc');
-                sortButton.textContent = '▲ Ascending';
-            } else {
-                sortButton.classList.add('desc');
-                sortButton.textContent = '▼ Descending';
-            }
-            
-            applySorting();
-        }
-
-        // Add search functionality to existing filter functions
-        function applyFilter() {
-            let baseReferences = searchResults.length > 0 ? searchResults : originalReferences;
-            
-            switch (currentFilter) {
-                case 'include':
-                    filteredReferences = baseReferences.filter(ref => ref.final_decision === 'include');
-                    break;
-                case 'exclude':
-                    filteredReferences = baseReferences.filter(ref => ref.final_decision === 'exclude');
-                    break;
-                case 'conflict':
-                    filteredReferences = baseReferences.filter(ref => ref.final_decision === 'conflict');
-                    break;
-                case 'pending':
-                    filteredReferences = baseReferences.filter(ref => !ref.final_decision || ref.status !== 'completed');
-                    break;
-                default:
-                    filteredReferences = [...baseReferences];
-            }
-            
-            // Reset index if it's out of bounds
-            if (currentAbstractIndex >= filteredReferences.length) {
-                currentAbstractIndex = 0;
-            }
-        }
-
-        // Enhanced renderAbstractCard to include search highlighting
-        function renderAbstractCardWithHighlighting(ref) {
-            const statusClass = getStatusClass(ref);
-            const confidenceScore = getConfidenceScore(ref);
-            
-            // Apply search highlighting if there are active search criteria
-            let title = ref.title || 'Untitled';
-            let authors = ref.authors || 'Unknown authors';
-            let journal = ref.journal || 'Unknown journal';
-            let abstract = ref.abstract || 'No abstract available';
-            
-            if (Object.keys(searchCriteria).length > 0) {
-                if (searchCriteria.title) title = highlightSearchTerms(title, searchCriteria.title);
-                if (searchCriteria.authors) authors = highlightSearchTerms(authors, searchCriteria.authors);
-                if (searchCriteria.journal) journal = highlightSearchTerms(journal, searchCriteria.journal);
-                if (searchCriteria.abstract) abstract = highlightSearchTerms(abstract, searchCriteria.abstract);
-            }
-            
-            return `
-                <div class="abstract-card">
-                    <div class="abstract-header">
-                        <div class="abstract-title">${title}</div>
-                        <div class="abstract-meta">
-                            <strong>Authors:</strong> ${authors}<br>
-                            <strong>Journal:</strong> ${journal} ${ref.year ? `(${ref.year})` : ''}<br>
-                            ${ref.doi ? `<strong>DOI:</strong> ${ref.doi}<br>` : ''}
-                            ${ref.keywords ? `<strong>Keywords:</strong> ${ref.keywords}<br>` : ''}
-                        </div>
-                        <div class="abstract-status">
-                            <div class="status-badge ${statusClass}">${getStatusText(ref)}</div>
-                            ${confidenceScore ? `<div class="confidence-score">${confidenceScore}% confidence</div>` : ''}
-                        </div>
-                    </div>
-                    
-                    <div class="abstract-content">
-                        <div class="abstract-text">
-                            ${abstract}
-                        </div>
-                        
-                        ${renderAIEvaluation(ref)}
-                    </div>
-                </div>
-            `;
-        }
-
-        // Update the displayCurrentAbstract function to use highlighting
-        function displayCurrentAbstract() {
-            const viewer = document.getElementById('abstractViewer');
-            
-            if (filteredReferences.length === 0) {
-                viewer.innerHTML = `
-                    <div class="no-evaluation">
-                        <p>No abstracts match the current filter: "${currentFilter}"</p>
-                        <p>Try selecting a different filter or complete more screening.</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            const ref = filteredReferences[currentAbstractIndex];
-            viewer.innerHTML = renderAbstractCardWithHighlighting(ref);
-        }
-
-        // Initialize
-        updateStartButton();
     </script>
 </body>
 </html>
-"""
-
-# --- 8. Enhanced API Endpoints ---
-
-@app.get("/", response_class=HTMLResponse)
-async def get_frontend():
-    """Serve the enhanced frontend"""
-    return HTML_CONTENT
+    """)
 
 @app.get("/api/providers")
 async def get_providers():
     """Get available LLM providers and their configurations"""
-    return {
-        "providers": {
-            provider_id: {
-                "name": config.name,
-                "display_name": config.display_name,
-                "models": config.models,
-                "default_model": config.default_model,
-                "requires_api_key": config.requires_api_key,
-                "default_endpoint": config.default_endpoint,
-                "supports_streaming": config.supports_streaming
-            }
-            for provider_id, config in LLM_PROVIDERS.items()
-        }
+    providers = {
+        "openai": ProviderConfig(
+            name="openai",
+            display_name="OpenAI (Recommended)",
+            models=["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
+            default_model="gpt-4o",
+            requires_api_key=True,
+            default_endpoint=None,
+            supports_streaming=True
+        ),
+        "anthropic": ProviderConfig(
+            name="anthropic",
+            display_name="Anthropic Claude (Recommended)",
+            models=["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+            default_model="claude-3-5-sonnet-20241022",
+            requires_api_key=True,
+            default_endpoint=None,
+            supports_streaming=True
+        ),
+        "ollama": ProviderConfig(
+            name="ollama",
+            display_name="Ollama (Local)",
+            models=["llama3.1:8b", "llama3.1:70b", "llama3:70b", "mistral:7b", "phi3:medium", "qwen2.5:7b"],
+            default_model="llama3.1:8b",
+            requires_api_key=False,
+            default_endpoint="http://localhost:11434",
+            supports_streaming=True
+        ),
+        "openai_compatible": ProviderConfig(
+            name="openai_compatible",
+            display_name="OpenAI-Compatible (Local/Custom)",
+            models=["llama-3.1-8b-instruct", "llama-3.1-70b-instruct", "mistral-7b-instruct", "qwen2.5-7b-instruct"],
+            default_model="llama-3.1-8b-instruct",
+            requires_api_key=False,
+            default_endpoint="http://localhost:1234/v1",
+            supports_streaming=True
+        ),
+        "cohere": ProviderConfig(
+            name="cohere",
+            display_name="Cohere",
+            models=["command-r-plus", "command-r", "command-nightly"],
+            default_model="command-r-plus",
+            requires_api_key=True,
+            default_endpoint=None,
+            supports_streaming=True
+        ),
+        "groq": ProviderConfig(
+            name="groq",
+            display_name="Groq (Fast Inference)",
+            models=["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+            default_model="llama-3.1-70b-versatile",
+            requires_api_key=True,
+            default_endpoint="https://api.groq.com/openai/v1",
+            supports_streaming=True
+        ),
+        "together": ProviderConfig(
+            name="together",
+            display_name="Together AI",
+            models=["meta-llama/Llama-3-8b-chat-hf", "meta-llama/Llama-3-70b-chat-hf", "mistralai/Mixtral-8x7B-Instruct-v0.1"],
+            default_model="meta-llama/Llama-3-70b-chat-hf",
+            requires_api_key=True,
+            default_endpoint="https://api.together.xyz/v1",
+            supports_streaming=True
+        ),
+        "custom": ProviderConfig(
+            name="custom",
+            display_name="Custom Provider (Advanced)",
+            models=["custom-model-1", "custom-model-2", "custom-model-3"],
+            default_model="custom-model-1",
+            requires_api_key=True,
+            default_endpoint="https://your-api-endpoint.com/v1",
+            supports_streaming=True
+        )
     }
+    
+    return {"providers": {k: v.dict() for k, v in providers.items()}}
 
 @app.post("/api/upload")
 async def upload_files(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
     """Enhanced file upload with immediate citation display"""
-    project = Project(
-        name=f"Otto-SR Project - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        screening_mode="single"
-    )
+    if not files:
+        raise HTTPException(400, "No files provided")
+    
+    # Create new project
+    project = Project(name=f"Project {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     db.add(project)
     db.commit()
     db.refresh(project)
     
-    total_citations = 0
-    uploaded_citations = []
+    all_citations = []
     
     for file in files:
         try:
-            content = (await file.read()).decode('utf-8', errors='ignore')
+            content = await file.read()
+            content_str = content.decode('utf-8', errors='ignore')
             
-            if file.filename and file.filename.endswith('.ris'):
-                citations_data = parse_ris_file(content)
-            elif file.filename and file.filename.endswith('.xml'):
-                citations_data = parse_xml_file(content)
-            elif file.filename and file.filename.endswith('.enw'):
-                citations_data = parse_endnote_file(content)
-            elif file.filename and file.filename.endswith('.bib'):
-                citations_data = parse_mendeley_file(content)
-            elif file.filename and file.filename.endswith('.rdf'):
-                citations_data = parse_zotero_file(content)
-            elif file.filename and file.filename.endswith('.json'):
-                # Try Zotero CSL JSON format
-                citations_data = parse_zotero_file(content)
+            # Parse based on file extension
+            filename = file.filename.lower()
+            if filename.endswith('.ris'):
+                citations = parse_ris_file(content_str)
+            elif filename.endswith('.xml'):
+                citations = parse_xml_file(content_str)
+            elif filename.endswith('.enw'):
+                citations = parse_endnote_file(content_str)
+            elif filename.endswith('.bib'):
+                citations = parse_mendeley_file(content_str)
+            elif filename.endswith(('.rdf', '.json')):
+                citations = parse_zotero_file(content_str)
             else:
-                continue
+                # Try auto-detection
+                if content_str.strip().startswith('TY  -'):
+                    citations = parse_ris_file(content_str)
+                elif content_str.strip().startswith('<'):
+                    citations = parse_xml_file(content_str)
+                else:
+                    citations = parse_ris_file(content_str)  # Fallback
             
-            for citation_data in citations_data:
+            # Store citations in database
+            for citation_data in citations:
                 citation = CitationRecord(
                     project_id=project.id,
-                    title=citation_data.get('title', 'No title'),
-                    authors=citation_data.get('authors'),
-                    journal=citation_data.get('journal'),
+                    title=citation_data.get('title', ''),
+                    authors=citation_data.get('authors', ''),
+                    journal=citation_data.get('journal', ''),
                     year=citation_data.get('year'),
-                    abstract=citation_data.get('abstract'),
-                    doi=citation_data.get('doi'),
-                    keywords=citation_data.get('keywords'),
-                    relevance_score=citation_data.get('relevance_score', 0.5)
+                    abstract=citation_data.get('abstract', ''),
+                    doi=citation_data.get('doi', ''),
+                    keywords=citation_data.get('keywords', ''),
+                    relevance_score=citation_data.get('relevance_score', 0.5),
+                    file_content=content_str[:1000]  # Store first 1000 chars for reference
                 )
                 db.add(citation)
-                db.flush()  # Get the ID before commit
-                
-                # Format abstract for display
-                abstract = citation_data.get('abstract', '')
-                display_abstract = abstract[:200] + "..." if len(abstract) > 200 else abstract
-                
-                # Add to display list with proper formatting
-                uploaded_citations.append({
-                    "id": str(citation.id),
-                    "title": citation.title,
-                    "authors": citation.authors,
-                    "journal": citation.journal,
-                    "year": citation.year,
-                    "abstract": display_abstract,
-                    "full_abstract": abstract,
-                    "doi": citation.doi,
-                    "keywords": citation.keywords,
-                    "relevance_score": round(citation.relevance_score, 2),
-                    "status": "uploaded"
-                })
-                total_citations += 1
+                all_citations.append(citation_data)
         
         except Exception as e:
-            continue  # Skip problematic files
+            db.rollback()
+            raise HTTPException(400, f"Error processing file {file.filename}: {str(e)}")
     
     db.commit()
     
-    # Log activity
-    activity = ActivityLog(
-        project_id=project.id,
-        action="files_uploaded",
-        details={"file_count": len(files), "citations_count": total_citations}
+    return CitationUploadResponse(
+        project_id=str(project.id),
+        citations_count=len(all_citations),
+        message=f"Successfully uploaded {len(all_citations)} citations",
+        citations=all_citations,
+        status="success"
     )
-    db.add(activity)
-    db.commit()
-    
-    return {
-        "project_id": str(project.id),
-        "citations_count": total_citations,
-        "message": f"Successfully uploaded {total_citations} citations",
-        "citations": uploaded_citations,  # Include citation data for immediate carousel display
-        "status": "success"
-    }
 
 @app.get("/api/projects/{project_id}/citations")
 async def get_citations(project_id: str, db: Session = Depends(get_db)):
     """Get citations for a project"""
-    citations = db.query(CitationRecord).filter(CitationRecord.project_id == project_id).all()
+    try:
+        project_uuid = uuid.UUID(project_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid project ID format")
     
-    results = []
+    citations = db.query(CitationRecord).filter(CitationRecord.project_id == project_uuid).all()
+    
+    citation_data = []
     for citation in citations:
-        # Get screening result if exists
-        screening_result = db.query(ScreeningResult).filter(ScreeningResult.citation_id == citation.id).first()
-        
-        citation_data = {
-            "id": str(citation.id),
-            "title": citation.title,
-            "authors": citation.authors,
-            "journal": citation.journal,
-            "year": citation.year,
-            "abstract": citation.abstract,
-            "relevance_score": citation.relevance_score,
-            "status": screening_result.status if screening_result else "pending",
-            "final_decision": screening_result.final_decision if screening_result else None,
-            "ai1_result": screening_result.ai1_result if screening_result else None,
-            "ai2_result": screening_result.ai2_result if screening_result else None
-        }
-        results.append(citation_data)
+        citation_data.append({
+            'id': str(citation.id),
+            'title': citation.title,
+            'authors': citation.authors,
+            'journal': citation.journal,
+            'year': citation.year,
+            'abstract': citation.abstract,
+            'doi': citation.doi,
+            'keywords': citation.keywords,
+            'relevance_score': float(citation.relevance_score) if citation.relevance_score else 0.5
+        })
     
-    return results
+    return citation_data
 
 @app.post("/api/test-llm")
 async def test_llm_connection(request: dict):
@@ -4937,35 +2883,45 @@ async def start_screening_job(
     db: Session = Depends(get_db)
 ):
     """Start enhanced screening job"""
-    project = db.query(Project).filter(Project.id == project_id).first()
+    try:
+        project_uuid = uuid.UUID(project_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid project ID format")
+    
+    # Validate project exists
+    project = db.query(Project).filter(Project.id == project_uuid).first()
     if not project:
         raise HTTPException(404, "Project not found")
     
-    # Update project with criteria and LLM configs
-    project.criteria = request.get('criteria', {})
-    project.screening_mode = request.get('mode', 'single')
+    # Store criteria in project
+    criteria = request.get('criteria', {})
+    project.criteria = criteria
     db.commit()
     
-    # Get citations to screen
-    citations = db.query(CitationRecord).filter(CitationRecord.project_id == project.id).all()
+    # Get citations
+    citations = db.query(CitationRecord).filter(CitationRecord.project_id == project_uuid).all()
     if not citations:
-        raise HTTPException(400, "No citations to screen")
+        raise HTTPException(400, "No citations found for this project")
     
+    # Create job ID
     job_id = str(uuid.uuid4())
+    
+    # Create screening results for each citation
     llm_configs = request.get('llm_configs', {})
     
-    # Create screening results and queue background tasks
     for citation in citations:
+        # Create screening result record
         result = ScreeningResult(
-            project_id=project.id,
             citation_id=citation.id,
+            project_id=project_uuid,
             job_id=job_id,
             status="pending"
         )
         db.add(result)
         db.commit()
+        db.refresh(result)
         
-        # Queue background screening task
+        # Add to background tasks
         background_tasks.add_task(
             advanced_screening_task,
             str(result.id),
@@ -4973,20 +2929,7 @@ async def start_screening_job(
             llm_configs
         )
     
-    # Log activity
-    activity = ActivityLog(
-        project_id=project.id,
-        action="screening_started",
-        details={
-            "job_id": job_id,
-            "mode": project.screening_mode,
-            "citations_count": len(citations)
-        }
-    )
-    db.add(activity)
-    db.commit()
-    
-    return {"job_id": job_id, "message": "Screening started", "citations_count": len(citations)}
+    return {"job_id": job_id, "message": f"Started screening {len(citations)} citations"}
 
 @app.get("/api/stream/{job_id}")
 async def stream_progress(job_id: str):
@@ -4995,31 +2938,33 @@ async def stream_progress(job_id: str):
         processed_ids = set()
         
         while True:
-            db_session = SessionLocal()
             try:
-                # Get completed results
+                db_session = SessionLocal()
+                
+                # Get unprocessed results
                 results = db_session.query(ScreeningResult).filter(
                     ScreeningResult.job_id == job_id,
-                    ~ScreeningResult.id.in_(processed_ids),
-                    ScreeningResult.status.in_(['completed', 'error'])
+                    ScreeningResult.status.in_(["completed", "error"])
                 ).all()
                 
+                # Send progress updates for new completions
                 for result in results:
-                    citation = db_session.query(CitationRecord).filter(CitationRecord.id == result.citation_id).first()
+                    if result.id not in processed_ids:
+                        citation = db_session.query(CitationRecord).filter(CitationRecord.id == result.citation_id).first()
+                        
+                        progress_data = {
+                            "citation_id": str(result.citation_id),
+                            "status": result.status,
+                            "ai1_result": result.ai1_result,
+                            "ai2_result": result.ai2_result,
+                            "final_decision": result.final_decision,
+                            "confidence_score": float(result.confidence_score) if result.confidence_score else 0.0,
+                            "title": citation.title if citation else "Unknown"
+                        }
+                        
+                        yield f"event: progress\ndata: {json.dumps(progress_data)}\n\n"
+                        processed_ids.add(result.id)
                     
-                    progress_data = {
-                        "citation_id": str(result.citation_id),
-                        "status": result.status,
-                        "final_decision": result.final_decision,
-                        "confidence_score": result.confidence_score,
-                        "ai1_result": result.ai1_result,
-                        "ai2_result": result.ai2_result,
-                        "title": citation.title if citation else "Unknown"
-                    }
-                    
-                    yield f"event: progress\ndata: {json.dumps(progress_data)}\n\n"
-                    processed_ids.add(result.id)
-                
                 # Check if job is complete
                 total_results = db_session.query(ScreeningResult).filter(ScreeningResult.job_id == job_id).count()
                 if total_results > 0 and len(processed_ids) >= total_results:
@@ -5039,11 +2984,16 @@ async def stream_progress(job_id: str):
 @app.get("/api/projects/{project_id}/export")
 async def export_results(project_id: str, db: Session = Depends(get_db)):
     """Export screening results"""
-    project = db.query(Project).filter(Project.id == project_id).first()
+    try:
+        project_uuid = uuid.UUID(project_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid project ID format")
+    
+    project = db.query(Project).filter(Project.id == project_uuid).first()
     if not project:
         raise HTTPException(404, "Project not found")
     
-    citations = db.query(CitationRecord).filter(CitationRecord.project_id == project_id).all()
+    citations = db.query(CitationRecord).filter(CitationRecord.project_id == project_uuid).all()
     results = []
     
     for citation in citations:
@@ -5063,7 +3013,7 @@ async def export_results(project_id: str, db: Session = Depends(get_db)):
             "screening": {
                 "status": screening_result.status if screening_result else "pending",
                 "final_decision": screening_result.final_decision if screening_result else None,
-                "confidence_score": screening_result.confidence_score if screening_result else None,
+                "confidence_score": float(screening_result.confidence_score) if screening_result and screening_result.confidence_score else None,
                 "ai1_result": screening_result.ai1_result if screening_result else None,
                 "ai2_result": screening_result.ai2_result if screening_result else None,
                 "human_decision": screening_result.human_decision if screening_result else None,
