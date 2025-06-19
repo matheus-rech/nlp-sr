@@ -1,0 +1,713 @@
+
+import json
+import logging
+import time
+from typing import Dict, List, Optional, Any, Union
+from dataclasses import dataclass, asdict
+from enum import Enum
+import openai
+from openai import OpenAI
+import pandas as pd
+from pathlib import Path
+import re
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class DataType(Enum):
+    """Enumeration for data types"""
+    NUMERICAL = "numerical"
+    CATEGORICAL = "categorical"
+    TEXT = "text"
+    BOOLEAN = "boolean"
+    DATE = "date"
+
+@dataclass
+class ExtractionVariable:
+    """Data class representing a variable to extract"""
+    name: str
+    description: str
+    data_type: DataType
+    required: bool = True
+    possible_values: Optional[List[str]] = None
+    units: Optional[str] = None
+    validation_rules: Optional[Dict[str, Any]] = None
+
+@dataclass
+class ExtractionResult:
+    """Data class representing extraction result for a single variable"""
+    variable_name: str
+    extracted_value: Any
+    confidence_score: float
+    source_location: str
+    evidence_quote: str
+    data_type: DataType
+    validation_status: str
+    extraction_notes: Optional[str] = None
+
+@dataclass
+class StudyExtractionResult:
+    """Data class representing complete extraction result for a study"""
+    study_id: str
+    citation_id: str
+    extraction_results: List[ExtractionResult]
+    overall_confidence: float
+    processing_time: float
+    model_used: str
+    extraction_timestamp: str
+    validation_summary: Dict[str, Any]
+    
+class DataExtractionAgent:
+    """
+    Main data extraction agent class implementing o3-mini-high based data extraction
+    """
+    
+    def __init__(self, api_key: str, model: str = "o3-mini"):
+        """
+        Initialize the data extraction agent
+        
+        Args:
+            api_key: OpenAI API key
+            model: Model name to use for extraction (o3-mini-high when available)
+        """
+        self.client = OpenAI(api_key=api_key)
+        self.model = model
+        self.extraction_history: List[StudyExtractionResult] = []
+        
+        # Model configuration based on paper specifications
+        self.model_config = {
+            "temperature": 0.1,  # Low temperature for consistent extraction
+            "max_tokens": 100000,  # High token limit for comprehensive extraction
+            # Note: o3-mini-high specific parameters would be added when available
+        }
+        
+    def _create_extraction_prompt(self, article_content: str, 
+                                variables: List[ExtractionVariable]) -> str:
+        """
+        Create data extraction prompt based on article content and variables
+        
+        Args:
+            article_content: Full text content of the research article
+            variables: List of variables to extract
+            
+        Returns:
+            Formatted prompt string
+        """
+        
+        # Create variable descriptions
+        variable_descriptions = []
+        for var in variables:
+            desc = f"**{var.name}** ({var.data_type.value}): {var.description}"
+            if var.units:
+                desc += f" (Units: {var.units})"
+            if var.possible_values:
+                desc += f" (Possible values: {', '.join(var.possible_values)})"
+            if not var.required:
+                desc += " (Optional)"
+            variable_descriptions.append(desc)
+        
+        prompt = f"""You are an expert systematic review researcher conducting data extraction from a research article. Your task is to systematically extract specific variables from the provided research article with high accuracy and precision.
+
+ARTICLE CONTENT:
+{article_content}
+
+VARIABLES TO EXTRACT:
+{chr(10).join(variable_descriptions)}
+
+EXTRACTION INSTRUCTIONS:
+1. Carefully read and analyze the entire article content
+2. For each variable, locate the relevant information in the article
+3. Extract the exact value as reported in the study
+4. Provide the specific quote from the article that contains the information
+5. Indicate the section/location where the information was found
+6. Assign a confidence score (0-100) for each extraction
+7. If information is not available, clearly state "Not reported" or "Not available"
+8. Ensure extracted values match the specified data type and format
+9. Apply any validation rules specified for each variable
+
+IMPORTANT GUIDELINES:
+- Extract data exactly as reported by the authors
+- Do not calculate or derive values unless explicitly requested
+- Distinguish between different time points or subgroups if relevant
+- Pay attention to units and convert if necessary
+- Note any limitations or caveats mentioned by the authors
+- Be precise with numerical values including confidence intervals and p-values
+
+Please provide your response in the following JSON format:
+{{
+    "extractions": [
+        {{
+            "variable_name": "variable_name",
+            "extracted_value": "exact_value_from_study",
+            "confidence_score": 95,
+            "source_location": "Results section, Table 2",
+            "evidence_quote": "Exact quote from the article containing the information",
+            "data_type": "numerical/categorical/text/boolean/date",
+            "validation_status": "valid/invalid/uncertain",
+            "extraction_notes": "Any additional notes or caveats"
+        }}
+    ],
+    "overall_assessment": {{
+        "study_quality": "Assessment of study quality for data extraction",
+        "data_completeness": "Assessment of how complete the reported data is",
+        "extraction_challenges": "Any challenges encountered during extraction",
+        "confidence_summary": "Overall confidence in the extraction results"
+    }},
+    "study_characteristics": {{
+        "study_design": "Type of study design",
+        "sample_size": "Total sample size",
+        "population": "Study population description",
+        "intervention": "Intervention description",
+        "comparator": "Comparator description",
+        "primary_outcome": "Primary outcome measure",
+        "follow_up_duration": "Follow-up period"
+    }}
+}}
+
+Ensure your response is valid JSON and includes specific textual evidence for all extractions."""
+
+        return prompt
+    
+    def _parse_extraction_response(self, response_text: str, 
+                                 variables: List[ExtractionVariable]) -> Dict[str, Any]:
+        """
+        Parse LLM response and extract structured data
+        
+        Args:
+            response_text: Raw response from LLM
+            variables: List of extraction variables
+            
+        Returns:
+            Parsed response dictionary
+        """
+        try:
+            # Try to extract JSON from response
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group()
+                parsed_response = json.loads(json_str)
+                
+                # Validate and clean the response
+                return self._validate_extraction_response(parsed_response, variables)
+            else:
+                logger.warning("Could not find JSON in response, attempting fallback parsing")
+                return self._fallback_extraction_parse(response_text, variables)
+                
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error: {e}")
+            return self._fallback_extraction_parse(response_text, variables)
+    
+    def _validate_extraction_response(self, response: Dict[str, Any], 
+                                    variables: List[ExtractionVariable]) -> Dict[str, Any]:
+        """
+        Validate and clean extraction response
+        
+        Args:
+            response: Parsed response dictionary
+            variables: List of extraction variables
+            
+        Returns:
+            Validated response dictionary
+        """
+        validated_response = {
+            "extractions": [],
+            "overall_assessment": response.get("overall_assessment", {}),
+            "study_characteristics": response.get("study_characteristics", {})
+        }
+        
+        # Validate each extraction
+        extractions = response.get("extractions", [])
+        variable_names = {var.name for var in variables}
+        
+        for extraction in extractions:
+            if extraction.get("variable_name") in variable_names:
+                # Find corresponding variable
+                var = next(v for v in variables if v.name == extraction["variable_name"])
+                
+                # Validate data type and value
+                validated_extraction = self._validate_single_extraction(extraction, var)
+                validated_response["extractions"].append(validated_extraction)
+        
+        # Check for missing required variables
+        extracted_names = {e["variable_name"] for e in validated_response["extractions"]}
+        missing_required = [v.name for v in variables if v.required and v.name not in extracted_names]
+        
+        if missing_required:
+            logger.warning(f"Missing required variables: {missing_required}")
+            # Add placeholder extractions for missing required variables
+            for var_name in missing_required:
+                var = next(v for v in variables if v.name == var_name)
+                placeholder = {
+                    "variable_name": var_name,
+                    "extracted_value": "Not reported",
+                    "confidence_score": 0.0,
+                    "source_location": "Not found",
+                    "evidence_quote": "Information not available in article",
+                    "data_type": var.data_type.value,
+                    "validation_status": "missing",
+                    "extraction_notes": "Required variable not found in article"
+                }
+                validated_response["extractions"].append(placeholder)
+        
+        return validated_response
+    
+    def _validate_single_extraction(self, extraction: Dict[str, Any], 
+                                  variable: ExtractionVariable) -> Dict[str, Any]:
+        """
+        Validate a single extraction result
+        
+        Args:
+            extraction: Single extraction dictionary
+            variable: Corresponding ExtractionVariable
+            
+        Returns:
+            Validated extraction dictionary
+        """
+        validated = extraction.copy()
+        
+        # Validate data type
+        extracted_value = extraction.get("extracted_value")
+        
+        if variable.data_type == DataType.NUMERICAL:
+            validated["extracted_value"] = self._validate_numerical_value(extracted_value)
+        elif variable.data_type == DataType.CATEGORICAL:
+            validated["extracted_value"] = self._validate_categorical_value(
+                extracted_value, variable.possible_values
+            )
+        elif variable.data_type == DataType.BOOLEAN:
+            validated["extracted_value"] = self._validate_boolean_value(extracted_value)
+        
+        # Apply validation rules if specified
+        if variable.validation_rules:
+            validation_result = self._apply_validation_rules(
+                validated["extracted_value"], variable.validation_rules
+            )
+            validated["validation_status"] = validation_result["status"]
+            if validation_result.get("notes"):
+                validated["extraction_notes"] = validation_result["notes"]
+        
+        # Ensure confidence score is valid
+        confidence = extraction.get("confidence_score", 0)
+        if not isinstance(confidence, (int, float)) or confidence < 0 or confidence > 100:
+            validated["confidence_score"] = 50.0
+        
+        return validated
+    
+    def _validate_numerical_value(self, value: Any) -> Union[float, str]:
+        """Validate numerical value"""
+        if value in ["Not reported", "Not available", "NA", None]:
+            return "Not reported"
+        
+        try:
+            # Handle ranges (e.g., "10-15")
+            if isinstance(value, str) and "-" in value and not value.startswith("-"):
+                parts = value.split("-")
+                if len(parts) == 2:
+                    try:
+                        float(parts[0])
+                        float(parts[1])
+                        return value  # Keep as range string
+                    except ValueError:
+                        pass
+            
+            # Try to convert to float
+            return float(value)
+        except (ValueError, TypeError):
+            return str(value)  # Keep as string if can't convert
+    
+    def _validate_categorical_value(self, value: Any, 
+                                  possible_values: Optional[List[str]]) -> str:
+        """Validate categorical value"""
+        if value in ["Not reported", "Not available", "NA", None]:
+            return "Not reported"
+        
+        str_value = str(value)
+        
+        if possible_values:
+            # Check if value matches any possible value (case-insensitive)
+            for possible in possible_values:
+                if str_value.lower() == possible.lower():
+                    return possible
+            
+            # If no exact match, return original value with note
+            return str_value
+        
+        return str_value
+    
+    def _validate_boolean_value(self, value: Any) -> Union[bool, str]:
+        """Validate boolean value"""
+        if value in ["Not reported", "Not available", "NA", None]:
+            return "Not reported"
+        
+        if isinstance(value, bool):
+            return value
+        
+        str_value = str(value).lower()
+        if str_value in ["true", "yes", "1", "positive"]:
+            return True
+        elif str_value in ["false", "no", "0", "negative"]:
+            return False
+        else:
+            return str(value)
+    
+    def _apply_validation_rules(self, value: Any, 
+                              rules: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply validation rules to extracted value"""
+        result = {"status": "valid", "notes": None}
+        
+        if value == "Not reported":
+            result["status"] = "missing"
+            return result
+        
+        # Range validation for numerical values
+        if "min_value" in rules or "max_value" in rules:
+            try:
+                num_value = float(value)
+                if "min_value" in rules and num_value < rules["min_value"]:
+                    result["status"] = "invalid"
+                    result["notes"] = f"Value {num_value} below minimum {rules['min_value']}"
+                elif "max_value" in rules and num_value > rules["max_value"]:
+                    result["status"] = "invalid"
+                    result["notes"] = f"Value {num_value} above maximum {rules['max_value']}"
+            except (ValueError, TypeError):
+                result["status"] = "uncertain"
+                result["notes"] = "Could not validate numerical range"
+        
+        # Pattern validation for text values
+        if "pattern" in rules:
+            pattern = rules["pattern"]
+            if not re.match(pattern, str(value)):
+                result["status"] = "invalid"
+                result["notes"] = f"Value does not match required pattern: {pattern}"
+        
+        return result
+    
+    def _fallback_extraction_parse(self, response_text: str, 
+                                 variables: List[ExtractionVariable]) -> Dict[str, Any]:
+        """
+        Fallback parsing method when JSON parsing fails
+        
+        Args:
+            response_text: Raw response text
+            variables: List of extraction variables
+            
+        Returns:
+            Basic parsed response
+        """
+        logger.warning("Using fallback extraction parsing")
+        
+        extractions = []
+        for var in variables:
+            # Simple pattern matching for variable names
+            pattern = rf"{var.name}[:\s]*([^\n]+)"
+            match = re.search(pattern, response_text, re.IGNORECASE)
+            
+            if match:
+                value = match.group(1).strip()
+            else:
+                value = "Not reported"
+            
+            extraction = {
+                "variable_name": var.name,
+                "extracted_value": value,
+                "confidence_score": 25.0,  # Low confidence for fallback
+                "source_location": "Fallback parsing",
+                "evidence_quote": match.group(0) if match else "Not found",
+                "data_type": var.data_type.value,
+                "validation_status": "uncertain",
+                "extraction_notes": "Extracted using fallback parsing method"
+            }
+            extractions.append(extraction)
+        
+        return {
+            "extractions": extractions,
+            "overall_assessment": {
+                "study_quality": "Could not assess - parsing error",
+                "data_completeness": "Unknown",
+                "extraction_challenges": "JSON parsing failed, used fallback method",
+                "confidence_summary": "Low confidence due to parsing issues"
+            },
+            "study_characteristics": {}
+        }
+    
+    def extract_data(self, study_id: str, citation_id: str, article_content: str,
+                    variables: List[ExtractionVariable]) -> StudyExtractionResult:
+        """
+        Extract data from a single study
+        
+        Args:
+            study_id: Unique study identifier
+            citation_id: Citation identifier
+            article_content: Full text content of the article
+            variables: List of variables to extract
+            
+        Returns:
+            StudyExtractionResult object
+        """
+        start_time = time.time()
+        
+        try:
+            # Create extraction prompt
+            prompt = self._create_extraction_prompt(article_content, variables)
+            
+            # Call OpenAI API
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                **self.model_config
+            )
+            
+            # Parse response
+            response_text = response.choices[0].message.content
+            parsed_response = self._parse_extraction_response(response_text, variables)
+            
+            # Create extraction results
+            extraction_results = []
+            for extraction_data in parsed_response["extractions"]:
+                result = ExtractionResult(
+                    variable_name=extraction_data["variable_name"],
+                    extracted_value=extraction_data["extracted_value"],
+                    confidence_score=extraction_data["confidence_score"],
+                    source_location=extraction_data["source_location"],
+                    evidence_quote=extraction_data["evidence_quote"],
+                    data_type=DataType(extraction_data["data_type"]),
+                    validation_status=extraction_data["validation_status"],
+                    extraction_notes=extraction_data.get("extraction_notes")
+                )
+                extraction_results.append(result)
+            
+            # Calculate overall confidence
+            confidences = [r.confidence_score for r in extraction_results]
+            overall_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+            
+            # Create study extraction result
+            study_result = StudyExtractionResult(
+                study_id=study_id,
+                citation_id=citation_id,
+                extraction_results=extraction_results,
+                overall_confidence=overall_confidence,
+                processing_time=time.time() - start_time,
+                model_used=self.model,
+                extraction_timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+                validation_summary=self._create_validation_summary(extraction_results)
+            )
+            
+            # Store in history
+            self.extraction_history.append(study_result)
+            
+            logger.info(f"Extracted data for study {study_id}: "
+                       f"{len(extraction_results)} variables, "
+                       f"confidence: {overall_confidence:.1f}")
+            
+            return study_result
+            
+        except Exception as e:
+            logger.error(f"Error extracting data for study {study_id}: {e}")
+            
+            # Return error result
+            error_results = []
+            for var in variables:
+                error_result = ExtractionResult(
+                    variable_name=var.name,
+                    extracted_value="Error",
+                    confidence_score=0.0,
+                    source_location="Error",
+                    evidence_quote=f"Error during extraction: {str(e)}",
+                    data_type=var.data_type,
+                    validation_status="error",
+                    extraction_notes=f"Extraction failed: {str(e)}"
+                )
+                error_results.append(error_result)
+            
+            return StudyExtractionResult(
+                study_id=study_id,
+                citation_id=citation_id,
+                extraction_results=error_results,
+                overall_confidence=0.0,
+                processing_time=time.time() - start_time,
+                model_used=self.model,
+                extraction_timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+                validation_summary={"error": str(e)}
+            )
+    
+    def _create_validation_summary(self, 
+                                 extraction_results: List[ExtractionResult]) -> Dict[str, Any]:
+        """
+        Create validation summary for extraction results
+        
+        Args:
+            extraction_results: List of extraction results
+            
+        Returns:
+            Validation summary dictionary
+        """
+        total = len(extraction_results)
+        valid = sum(1 for r in extraction_results if r.validation_status == "valid")
+        invalid = sum(1 for r in extraction_results if r.validation_status == "invalid")
+        missing = sum(1 for r in extraction_results if r.validation_status == "missing")
+        uncertain = sum(1 for r in extraction_results if r.validation_status == "uncertain")
+        
+        return {
+            "total_variables": total,
+            "valid_extractions": valid,
+            "invalid_extractions": invalid,
+            "missing_extractions": missing,
+            "uncertain_extractions": uncertain,
+            "validation_rate": valid / total if total > 0 else 0.0,
+            "completeness_rate": (total - missing) / total if total > 0 else 0.0
+        }
+    
+    def extract_batch(self, studies: List[Dict[str, Any]], 
+                     variables: List[ExtractionVariable]) -> List[StudyExtractionResult]:
+        """
+        Extract data from a batch of studies
+        
+        Args:
+            studies: List of study dictionaries with 'study_id', 'citation_id', 'content'
+            variables: List of variables to extract
+            
+        Returns:
+            List of StudyExtractionResult objects
+        """
+        results = []
+        
+        logger.info(f"Starting batch extraction for {len(studies)} studies")
+        
+        for i, study in enumerate(studies):
+            logger.info(f"Extracting data from study {i+1}/{len(studies)}: {study['study_id']}")
+            
+            result = self.extract_data(
+                study['study_id'],
+                study['citation_id'],
+                study['content'],
+                variables
+            )
+            results.append(result)
+            
+            # Add small delay to respect rate limits
+            time.sleep(0.1)
+        
+        # Log summary
+        avg_confidence = sum(r.overall_confidence for r in results) / len(results)
+        valid_extractions = sum(
+            r.validation_summary.get("valid_extractions", 0) for r in results
+        )
+        total_extractions = sum(
+            r.validation_summary.get("total_variables", 0) for r in results
+        )
+        
+        logger.info(f"Batch extraction completed. "
+                   f"Average confidence: {avg_confidence:.1f}, "
+                   f"Valid extractions: {valid_extractions}/{total_extractions}")
+        
+        return results
+    
+    def export_results(self, filepath: str, format: str = "csv") -> None:
+        """
+        Export extraction results to file
+        
+        Args:
+            filepath: Output file path
+            format: Export format (csv, json, excel)
+        """
+        if not self.extraction_history:
+            logger.warning("No extraction results to export")
+            return
+        
+        # Convert results to DataFrame
+        data = []
+        for study_result in self.extraction_history:
+            base_row = {
+                "study_id": study_result.study_id,
+                "citation_id": study_result.citation_id,
+                "overall_confidence": study_result.overall_confidence,
+                "processing_time": study_result.processing_time,
+                "model_used": study_result.model_used,
+                "extraction_timestamp": study_result.extraction_timestamp
+            }
+            
+            # Add validation summary
+            for key, value in study_result.validation_summary.items():
+                base_row[f"validation_{key}"] = value
+            
+            # Add each extraction result as columns
+            for extraction in study_result.extraction_results:
+                row = base_row.copy()
+                row.update({
+                    "variable_name": extraction.variable_name,
+                    "extracted_value": extraction.extracted_value,
+                    "confidence_score": extraction.confidence_score,
+                    "source_location": extraction.source_location,
+                    "evidence_quote": extraction.evidence_quote,
+                    "data_type": extraction.data_type.value,
+                    "validation_status": extraction.validation_status,
+                    "extraction_notes": extraction.extraction_notes or ""
+                })
+                data.append(row)
+        
+        df = pd.DataFrame(data)
+        
+        # Export based on format
+        if format.lower() == "csv":
+            df.to_csv(filepath, index=False)
+        elif format.lower() == "json":
+            df.to_json(filepath, orient="records", indent=2)
+        elif format.lower() == "excel":
+            df.to_excel(filepath, index=False)
+        else:
+            raise ValueError(f"Unsupported export format: {format}")
+        
+        logger.info(f"Exported {len(data)} extraction results to {filepath}")
+    
+    def get_performance_metrics(self, ground_truth: List[Dict[str, Any]]) -> Dict[str, float]:
+        """
+        Calculate extraction performance metrics against ground truth
+        
+        Args:
+            ground_truth: List of ground truth extraction data
+            
+        Returns:
+            Dictionary of performance metrics
+        """
+        if not self.extraction_history:
+            return {}
+        
+        # Create lookup for ground truth
+        truth_dict = {}
+        for gt in ground_truth:
+            key = (gt["study_id"], gt["variable_name"])
+            truth_dict[key] = gt["true_value"]
+        
+        # Calculate accuracy metrics
+        total_comparisons = 0
+        correct_extractions = 0
+        
+        for study_result in self.extraction_history:
+            for extraction in study_result.extraction_results:
+                key = (study_result.study_id, extraction.variable_name)
+                if key in truth_dict:
+                    total_comparisons += 1
+                    true_value = truth_dict[key]
+                    extracted_value = extraction.extracted_value
+                    
+                    # Simple equality check (could be enhanced for numerical tolerance)
+                    if str(extracted_value).strip().lower() == str(true_value).strip().lower():
+                        correct_extractions += 1
+        
+        accuracy = correct_extractions / total_comparisons if total_comparisons > 0 else 0.0
+        
+        # Calculate confidence metrics
+        confidences = []
+        for study_result in self.extraction_history:
+            confidences.extend([r.confidence_score for r in study_result.extraction_results])
+        
+        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+        
+        return {
+            "accuracy": accuracy,
+            "total_comparisons": total_comparisons,
+            "correct_extractions": correct_extractions,
+            "average_confidence": avg_confidence,
+            "total_extractions": len(confidences)
+        }

@@ -1,0 +1,632 @@
+import asyncio
+import json
+import time
+import logging
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass, asdict
+from enum import Enum
+import hashlib
+import statistics
+from datetime import datetime, timedelta
+
+# Enhanced LLM Provider Support
+class LLMProvider(Enum):
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    GOOGLE = "google"
+    OLLAMA = "ollama"
+    HUGGINGFACE = "huggingface"
+    AZURE_OPENAI = "azure_openai"
+    COHERE = "cohere"
+
+class TaskType(Enum):
+    SCREENING = "screening"
+    EXTRACTION = "extraction"
+    PDF_PROCESSING = "pdf_processing"
+    QUALITY_ASSESSMENT = "quality_assessment"
+    CONFLICT_RESOLUTION = "conflict_resolution"
+
+@dataclass
+class LLMConfig:
+    """Enhanced LLM configuration with optimization parameters"""
+    provider: LLMProvider
+    model_name: str
+    temperature: float = 0.1
+    max_tokens: int = 4000
+    top_p: float = 0.9
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
+    timeout: int = 30
+    retry_attempts: int = 3
+    cache_enabled: bool = True
+    batch_size: int = 10
+    rate_limit_rpm: int = 60
+    cost_per_token: float = 0.0
+    quality_score: float = 0.0
+    specialized_for: List[TaskType] = None
+
+@dataclass
+class LLMResponse:
+    """Enhanced LLM response with metadata"""
+    content: str
+    provider: LLMProvider
+    model: str
+    tokens_used: int
+    cost: float
+    response_time: float
+    confidence: float
+    quality_score: float
+    cached: bool = False
+    timestamp: datetime = None
+
+class EnhancedLLMManager:
+    """Advanced LLM manager with intelligent routing and optimization"""
+    
+    def __init__(self):
+        self.providers = {}
+        self.model_configs = {}
+        self.performance_cache = {}
+        self.response_cache = {}
+        self.usage_stats = {}
+        self.quality_metrics = {}
+        self.logger = logging.getLogger(__name__)
+        
+        # Initialize default model configurations
+        self._initialize_default_configs()
+        
+    def _initialize_default_configs(self):
+        """Initialize default configurations for various models"""
+        
+        # OpenAI Models
+        self.model_configs.update({
+            "gpt-4-turbo": LLMConfig(
+                provider=LLMProvider.OPENAI,
+                model_name="gpt-4-turbo",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.00003,
+                quality_score=0.95,
+                specialized_for=[TaskType.SCREENING, TaskType.EXTRACTION]
+            ),
+            "gpt-4": LLMConfig(
+                provider=LLMProvider.OPENAI,
+                model_name="gpt-4",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.00006,
+                quality_score=0.93,
+                specialized_for=[TaskType.SCREENING, TaskType.EXTRACTION]
+            ),
+            "gpt-3.5-turbo": LLMConfig(
+                provider=LLMProvider.OPENAI,
+                model_name="gpt-3.5-turbo",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.000002,
+                quality_score=0.85,
+                specialized_for=[TaskType.SCREENING]
+            )
+        })
+        
+        # Anthropic Models
+        self.model_configs.update({
+            "claude-3-opus": LLMConfig(
+                provider=LLMProvider.ANTHROPIC,
+                model_name="claude-3-opus-20240229",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.000075,
+                quality_score=0.96,
+                specialized_for=[TaskType.SCREENING, TaskType.EXTRACTION, TaskType.QUALITY_ASSESSMENT]
+            ),
+            "claude-3-sonnet": LLMConfig(
+                provider=LLMProvider.ANTHROPIC,
+                model_name="claude-3-sonnet-20240229",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.000015,
+                quality_score=0.92,
+                specialized_for=[TaskType.SCREENING, TaskType.EXTRACTION]
+            )
+        })
+        
+        # Google Models
+        self.model_configs.update({
+            "gemini-2.0-flash": LLMConfig(
+                provider=LLMProvider.GOOGLE,
+                model_name="gemini-2.0-flash",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.000001,
+                quality_score=0.88,
+                specialized_for=[TaskType.PDF_PROCESSING, TaskType.SCREENING]
+            ),
+            "gemini-pro": LLMConfig(
+                provider=LLMProvider.GOOGLE,
+                model_name="gemini-pro",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.000005,
+                quality_score=0.87,
+                specialized_for=[TaskType.SCREENING, TaskType.EXTRACTION]
+            )
+        })
+        
+        # Ollama Models (Local)
+        self.model_configs.update({
+            "llama3.1:70b": LLMConfig(
+                provider=LLMProvider.OLLAMA,
+                model_name="llama3.1:70b",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.0,  # Local model
+                quality_score=0.89,
+                specialized_for=[TaskType.SCREENING, TaskType.EXTRACTION]
+            ),
+            "llama3.1:8b": LLMConfig(
+                provider=LLMProvider.OLLAMA,
+                model_name="llama3.1:8b",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.0,  # Local model
+                quality_score=0.82,
+                specialized_for=[TaskType.SCREENING]
+            ),
+            "mistral:7b": LLMConfig(
+                provider=LLMProvider.OLLAMA,
+                model_name="mistral:7b",
+                temperature=0.1,
+                max_tokens=4000,
+                cost_per_token=0.0,  # Local model
+                quality_score=0.80,
+                specialized_for=[TaskType.SCREENING]
+            )
+        })
+
+    def get_optimal_model(self, task_type: TaskType, budget_limit: float = None, 
+                         quality_threshold: float = 0.85) -> str:
+        """Intelligent model selection based on task type, budget, and quality requirements"""
+        
+        suitable_models = []
+        
+        for model_name, config in self.model_configs.items():
+            # Check if model is specialized for this task type
+            if config.specialized_for and task_type in config.specialized_for:
+                # Check quality threshold
+                if config.quality_score >= quality_threshold:
+                    # Check budget constraint
+                    if budget_limit is None or config.cost_per_token <= budget_limit:
+                        suitable_models.append((model_name, config))
+        
+        if not suitable_models:
+            # Fallback to any model meeting quality threshold
+            suitable_models = [
+                (name, config) for name, config in self.model_configs.items()
+                if config.quality_score >= quality_threshold
+            ]
+        
+        if not suitable_models:
+            # Final fallback to best available model
+            suitable_models = [(name, config) for name, config in self.model_configs.items()]
+        
+        # Sort by quality score (descending) and cost (ascending)
+        suitable_models.sort(key=lambda x: (-x[1].quality_score, x[1].cost_per_token))
+        
+        return suitable_models[0][0] if suitable_models else "gpt-3.5-turbo"
+
+    async def generate_response(self, prompt: str, model_name: str, 
+                              task_type: TaskType = None, **kwargs) -> LLMResponse:
+        """Enhanced response generation with caching, optimization, and monitoring"""
+        
+        start_time = time.time()
+        
+        # Check cache first
+        cache_key = self._generate_cache_key(prompt, model_name, kwargs)
+        if cache_key in self.response_cache:
+            cached_response = self.response_cache[cache_key]
+            cached_response.cached = True
+            return cached_response
+        
+        config = self.model_configs.get(model_name)
+        if not config:
+            raise ValueError(f"Unknown model: {model_name}")
+        
+        try:
+            # Generate response based on provider
+            if config.provider == LLMProvider.OPENAI:
+                response = await self._generate_openai_response(prompt, config, **kwargs)
+            elif config.provider == LLMProvider.ANTHROPIC:
+                response = await self._generate_anthropic_response(prompt, config, **kwargs)
+            elif config.provider == LLMProvider.GOOGLE:
+                response = await self._generate_google_response(prompt, config, **kwargs)
+            elif config.provider == LLMProvider.OLLAMA:
+                response = await self._generate_ollama_response(prompt, config, **kwargs)
+            else:
+                raise ValueError(f"Unsupported provider: {config.provider}")
+            
+            # Calculate metrics
+            response_time = time.time() - start_time
+            response.response_time = response_time
+            response.timestamp = datetime.now()
+            
+            # Cache response if enabled
+            if config.cache_enabled:
+                self.response_cache[cache_key] = response
+            
+            # Update usage statistics
+            self._update_usage_stats(model_name, response)
+            
+            return response
+            
+        except Exception as e:
+            self.logger.error(f"Error generating response with {model_name}: {e}")
+            raise
+
+    async def dual_llm_evaluation(self, prompt: str, primary_model: str, 
+                                secondary_model: str, task_type: TaskType) -> Dict[str, Any]:
+        """Enhanced dual-LLM evaluation with conflict resolution"""
+        
+        # Generate responses from both models concurrently
+        primary_task = self.generate_response(prompt, primary_model, task_type)
+        secondary_task = self.generate_response(prompt, secondary_model, task_type)
+        
+        primary_response, secondary_response = await asyncio.gather(
+            primary_task, secondary_task, return_exceptions=True
+        )
+        
+        # Handle exceptions
+        if isinstance(primary_response, Exception):
+            self.logger.error(f"Primary model {primary_model} failed: {primary_response}")
+            return {"status": "error", "error": str(primary_response)}
+        
+        if isinstance(secondary_response, Exception):
+            self.logger.error(f"Secondary model {secondary_model} failed: {secondary_response}")
+            return {"status": "partial", "primary_response": primary_response}
+        
+        # Analyze agreement
+        agreement_score = self._calculate_agreement(primary_response, secondary_response)
+        
+        result = {
+            "status": "success",
+            "primary_response": primary_response,
+            "secondary_response": secondary_response,
+            "agreement_score": agreement_score,
+            "requires_human_review": agreement_score < 0.8,
+            "confidence": min(primary_response.confidence, secondary_response.confidence),
+            "combined_quality": (primary_response.quality_score + secondary_response.quality_score) / 2
+        }
+        
+        # Conflict resolution
+        if agreement_score < 0.8:
+            result["conflict_resolution"] = await self._resolve_conflict(
+                primary_response, secondary_response, prompt, task_type
+            )
+        
+        return result
+
+    async def batch_process(self, prompts: List[str], model_name: str, 
+                          task_type: TaskType, batch_size: int = None) -> List[LLMResponse]:
+        """Optimized batch processing with rate limiting and error handling"""
+        
+        config = self.model_configs.get(model_name)
+        if not config:
+            raise ValueError(f"Unknown model: {model_name}")
+        
+        batch_size = batch_size or config.batch_size
+        results = []
+        
+        # Process in batches
+        for i in range(0, len(prompts), batch_size):
+            batch = prompts[i:i + batch_size]
+            
+            # Create tasks for concurrent processing
+            tasks = [
+                self.generate_response(prompt, model_name, task_type)
+                for prompt in batch
+            ]
+            
+            # Execute batch with rate limiting
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Handle results and exceptions
+            for j, result in enumerate(batch_results):
+                if isinstance(result, Exception):
+                    self.logger.error(f"Batch item {i+j} failed: {result}")
+                    # Create error response
+                    error_response = LLMResponse(
+                        content=f"Error: {str(result)}",
+                        provider=config.provider,
+                        model=model_name,
+                        tokens_used=0,
+                        cost=0.0,
+                        response_time=0.0,
+                        confidence=0.0,
+                        quality_score=0.0
+                    )
+                    results.append(error_response)
+                else:
+                    results.append(result)
+            
+            # Rate limiting delay
+            if i + batch_size < len(prompts):
+                delay = 60.0 / config.rate_limit_rpm * batch_size
+                await asyncio.sleep(delay)
+        
+        return results
+
+    def get_performance_analytics(self) -> Dict[str, Any]:
+        """Comprehensive performance analytics and insights"""
+        
+        analytics = {
+            "model_performance": {},
+            "cost_analysis": {},
+            "quality_metrics": {},
+            "usage_patterns": {},
+            "recommendations": []
+        }
+        
+        # Model performance analysis
+        for model_name, stats in self.usage_stats.items():
+            if stats["total_requests"] > 0:
+                analytics["model_performance"][model_name] = {
+                    "total_requests": stats["total_requests"],
+                    "average_response_time": stats["total_response_time"] / stats["total_requests"],
+                    "average_confidence": stats["total_confidence"] / stats["total_requests"],
+                    "success_rate": stats["successful_requests"] / stats["total_requests"],
+                    "total_cost": stats["total_cost"],
+                    "cost_per_request": stats["total_cost"] / stats["total_requests"]
+                }
+        
+        # Generate recommendations
+        analytics["recommendations"] = self._generate_recommendations()
+        
+        return analytics
+
+    def optimize_model_selection(self, historical_data: List[Dict]) -> Dict[str, str]:
+        """AI-driven model optimization based on historical performance"""
+        
+        task_recommendations = {}
+        
+        for task_type in TaskType:
+            # Analyze historical performance for this task type
+            task_data = [d for d in historical_data if d.get("task_type") == task_type.value]
+            
+            if not task_data:
+                # Use default optimal model
+                task_recommendations[task_type.value] = self.get_optimal_model(task_type)
+                continue
+            
+            # Calculate performance scores for each model
+            model_scores = {}
+            for data in task_data:
+                model = data["model"]
+                score = (
+                    data.get("quality_score", 0.5) * 0.4 +
+                    (1 - data.get("response_time", 10) / 10) * 0.3 +
+                    data.get("confidence", 0.5) * 0.2 +
+                    (1 - data.get("cost", 1) / 1) * 0.1
+                )
+                
+                if model not in model_scores:
+                    model_scores[model] = []
+                model_scores[model].append(score)
+            
+            # Find best performing model
+            best_model = None
+            best_score = 0
+            
+            for model, scores in model_scores.items():
+                avg_score = statistics.mean(scores)
+                if avg_score > best_score:
+                    best_score = avg_score
+                    best_model = model
+            
+            task_recommendations[task_type.value] = best_model or self.get_optimal_model(task_type)
+        
+        return task_recommendations
+
+    # Helper methods
+    def _generate_cache_key(self, prompt: str, model: str, kwargs: Dict) -> str:
+        """Generate cache key for response caching"""
+        content = f"{prompt}:{model}:{json.dumps(kwargs, sort_keys=True)}"
+        return hashlib.md5(content.encode()).hexdigest()
+
+    def _calculate_agreement(self, response1: LLMResponse, response2: LLMResponse) -> float:
+        """Calculate agreement score between two responses"""
+        # Simplified agreement calculation
+        # In practice, this would use more sophisticated NLP techniques
+        
+        content1 = response1.content.lower().strip()
+        content2 = response2.content.lower().strip()
+        
+        # Basic similarity check
+        if content1 == content2:
+            return 1.0
+        
+        # Check for similar decisions (include/exclude)
+        if ("include" in content1 and "include" in content2) or \
+           ("exclude" in content1 and "exclude" in content2):
+            return 0.8
+        
+        # Check confidence alignment
+        conf_diff = abs(response1.confidence - response2.confidence)
+        if conf_diff < 0.2:
+            return 0.6
+        
+        return 0.3
+
+    async def _resolve_conflict(self, response1: LLMResponse, response2: LLMResponse, 
+                              prompt: str, task_type: TaskType) -> Dict[str, Any]:
+        """Resolve conflicts between dual LLM responses"""
+        
+        # Use a third, high-quality model for conflict resolution
+        resolver_model = self.get_optimal_model(TaskType.CONFLICT_RESOLUTION, quality_threshold=0.9)
+        
+        conflict_prompt = f"""
+        Two AI models provided different responses to the same systematic review task.
+        
+        Original Task: {prompt}
+        
+        Response 1: {response1.content}
+        Confidence: {response1.confidence}
+        
+        Response 2: {response2.content}
+        Confidence: {response2.confidence}
+        
+        Please analyze both responses and provide:
+        1. Which response is more accurate and why
+        2. A final decision with justification
+        3. Confidence level (0-1)
+        
+        Provide your analysis in JSON format.
+        """
+        
+        try:
+            resolution = await self.generate_response(conflict_prompt, resolver_model, task_type)
+            return {
+                "resolver_model": resolver_model,
+                "resolution": resolution.content,
+                "resolver_confidence": resolution.confidence
+            }
+        except Exception as e:
+            return {
+                "error": f"Conflict resolution failed: {str(e)}",
+                "fallback": "Human review required"
+            }
+
+    def _update_usage_stats(self, model_name: str, response: LLMResponse):
+        """Update usage statistics for performance tracking"""
+        
+        if model_name not in self.usage_stats:
+            self.usage_stats[model_name] = {
+                "total_requests": 0,
+                "successful_requests": 0,
+                "total_response_time": 0.0,
+                "total_confidence": 0.0,
+                "total_cost": 0.0
+            }
+        
+        stats = self.usage_stats[model_name]
+        stats["total_requests"] += 1
+        stats["successful_requests"] += 1
+        stats["total_response_time"] += response.response_time
+        stats["total_confidence"] += response.confidence
+        stats["total_cost"] += response.cost
+
+    def _generate_recommendations(self) -> List[str]:
+        """Generate optimization recommendations based on usage patterns"""
+        
+        recommendations = []
+        
+        # Analyze cost efficiency
+        high_cost_models = [
+            model for model, stats in self.usage_stats.items()
+            if stats.get("total_cost", 0) > 10.0 and stats.get("total_requests", 0) > 100
+        ]
+        
+        if high_cost_models:
+            recommendations.append(
+                f"Consider using more cost-effective models for high-volume tasks. "
+                f"High-cost models detected: {', '.join(high_cost_models)}"
+            )
+        
+        # Analyze performance issues
+        slow_models = [
+            model for model, stats in self.usage_stats.items()
+            if stats.get("total_requests", 0) > 0 and 
+            (stats["total_response_time"] / stats["total_requests"]) > 10.0
+        ]
+        
+        if slow_models:
+            recommendations.append(
+                f"Performance optimization needed for: {', '.join(slow_models)}. "
+                f"Consider using faster models or implementing caching."
+            )
+        
+        return recommendations
+
+    # Provider-specific implementations (simplified for demo)
+    async def _generate_openai_response(self, prompt: str, config: LLMConfig, **kwargs) -> LLMResponse:
+        """Generate OpenAI response (simplified implementation)"""
+        # In real implementation, this would use the OpenAI API
+        return LLMResponse(
+            content="Simulated OpenAI response",
+            provider=config.provider,
+            model=config.model_name,
+            tokens_used=100,
+            cost=config.cost_per_token * 100,
+            response_time=2.0,
+            confidence=0.85,
+            quality_score=config.quality_score
+        )
+
+    async def _generate_anthropic_response(self, prompt: str, config: LLMConfig, **kwargs) -> LLMResponse:
+        """Generate Anthropic response (simplified implementation)"""
+        return LLMResponse(
+            content="Simulated Anthropic response",
+            provider=config.provider,
+            model=config.model_name,
+            tokens_used=120,
+            cost=config.cost_per_token * 120,
+            response_time=2.5,
+            confidence=0.88,
+            quality_score=config.quality_score
+        )
+
+    async def _generate_google_response(self, prompt: str, config: LLMConfig, **kwargs) -> LLMResponse:
+        """Generate Google response (simplified implementation)"""
+        return LLMResponse(
+            content="Simulated Google response",
+            provider=config.provider,
+            model=config.model_name,
+            tokens_used=90,
+            cost=config.cost_per_token * 90,
+            response_time=1.8,
+            confidence=0.82,
+            quality_score=config.quality_score
+        )
+
+    async def _generate_ollama_response(self, prompt: str, config: LLMConfig, **kwargs) -> LLMResponse:
+        """Generate Ollama response (simplified implementation)"""
+        return LLMResponse(
+            content="Simulated Ollama response",
+            provider=config.provider,
+            model=config.model_name,
+            tokens_used=110,
+            cost=0.0,  # Local model
+            response_time=3.0,
+            confidence=0.80,
+            quality_score=config.quality_score
+        )
+
+# Example usage and testing
+async def main():
+    """Test the enhanced LLM manager"""
+    
+    manager = EnhancedLLMManager()
+    
+    # Test optimal model selection
+    screening_model = manager.get_optimal_model(TaskType.SCREENING, quality_threshold=0.9)
+    print(f"Optimal screening model: {screening_model}")
+    
+    extraction_model = manager.get_optimal_model(TaskType.EXTRACTION, budget_limit=0.00005)
+    print(f"Optimal extraction model (budget-constrained): {extraction_model}")
+    
+    # Test dual LLM evaluation
+    test_prompt = "Evaluate this study for inclusion in a diabetes systematic review..."
+    dual_result = await manager.dual_llm_evaluation(
+        test_prompt, "gpt-4-turbo", "claude-3-opus", TaskType.SCREENING
+    )
+    print(f"Dual LLM evaluation result: {dual_result['status']}")
+    
+    # Test batch processing
+    test_prompts = [f"Test prompt {i}" for i in range(5)]
+    batch_results = await manager.batch_process(test_prompts, "gpt-3.5-turbo", TaskType.SCREENING)
+    print(f"Batch processing completed: {len(batch_results)} results")
+    
+    # Get performance analytics
+    analytics = manager.get_performance_analytics()
+    print(f"Performance analytics: {len(analytics['recommendations'])} recommendations")
+
+if __name__ == "__main__":
+    asyncio.run(main())

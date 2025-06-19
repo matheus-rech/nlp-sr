@@ -233,6 +233,11 @@ class LLMConfig(BaseModel):
     api_key: Optional[str] = None
     temperature: float = 0.1
     max_tokens: int = 2000
+    cost_per_token: float = 0.0
+    quality_score: float = 0.85
+    response_time_avg: float = 0.0
+    success_rate: float = 1.0
+    specialization: List[str] = []
 
 # Structured Output Schema with Pydantic
 class ScreeningDecision(LangChainBaseModel):
@@ -404,6 +409,162 @@ def parse_ris_file(content: str) -> List[Dict[str, Any]]:
         citations.append(citation)
     
     return citations
+
+# --- 6. Advanced Performance Analytics ---
+
+class PerformanceTracker:
+    """Track LLM performance metrics for optimization"""
+    
+    def __init__(self):
+        self.metrics = {}
+        self.session_start = datetime.utcnow()
+    
+    def record_response(self, provider: str, model: str, response_time: float, 
+                       tokens: int, success: bool, confidence: float = 0.0):
+        """Record LLM response metrics"""
+        key = f"{provider}:{model}"
+        
+        if key not in self.metrics:
+            self.metrics[key] = {
+                "total_requests": 0,
+                "successful_requests": 0,
+                "total_response_time": 0.0,
+                "total_tokens": 0,
+                "total_confidence": 0.0,
+                "error_count": 0,
+                "first_seen": datetime.utcnow(),
+                "last_used": datetime.utcnow()
+            }
+        
+        stats = self.metrics[key]
+        stats["total_requests"] += 1
+        stats["total_response_time"] += response_time
+        stats["total_tokens"] += tokens
+        stats["last_used"] = datetime.utcnow()
+        
+        if success:
+            stats["successful_requests"] += 1
+            stats["total_confidence"] += confidence
+        else:
+            stats["error_count"] += 1
+    
+    def get_analytics(self) -> Dict[str, Any]:
+        """Generate comprehensive performance analytics"""
+        analytics = {
+            "session_duration": (datetime.utcnow() - self.session_start).total_seconds(),
+            "models": {},
+            "recommendations": []
+        }
+        
+        for key, stats in self.metrics.items():
+            if stats["total_requests"] > 0:
+                provider, model = key.split(":", 1)
+                avg_response_time = stats["total_response_time"] / stats["total_requests"]
+                success_rate = stats["successful_requests"] / stats["total_requests"]
+                avg_confidence = stats["total_confidence"] / max(stats["successful_requests"], 1)
+                
+                analytics["models"][key] = {
+                    "provider": provider,
+                    "model": model,
+                    "requests": stats["total_requests"],
+                    "success_rate": round(success_rate * 100, 1),
+                    "avg_response_time": round(avg_response_time, 2),
+                    "avg_confidence": round(avg_confidence, 2),
+                    "total_tokens": stats["total_tokens"],
+                    "errors": stats["error_count"]
+                }
+                
+                # Generate recommendations
+                if success_rate < 0.8:
+                    analytics["recommendations"].append(f"Low success rate for {key} ({success_rate*100:.1f}%)")
+                if avg_response_time > 10:
+                    analytics["recommendations"].append(f"Slow response time for {key} ({avg_response_time:.1f}s)")
+        
+        return analytics
+
+class ConflictResolver:
+    """Advanced conflict resolution for dual LLM disagreements"""
+    
+    @staticmethod
+    def calculate_agreement_score(result1: Dict, result2: Dict) -> float:
+        """Calculate sophisticated agreement score between two LLM results"""
+        if not result1 or not result2:
+            return 0.0
+        
+        # Decision agreement (most important)
+        decision1 = result1.get("decision", "").lower()
+        decision2 = result2.get("decision", "").lower()
+        decision_match = 0.4 if decision1 == decision2 else 0.0
+        
+        # Confidence alignment
+        conf1 = result1.get("confidence", 0) / 100.0
+        conf2 = result2.get("confidence", 0) / 100.0
+        conf_diff = abs(conf1 - conf2)
+        confidence_score = 0.3 * (1.0 - conf_diff)
+        
+        # PICO scores alignment
+        pico1 = result1.get("pico_scores", {})
+        pico2 = result2.get("pico_scores", {})
+        pico_agreement = 0.0
+        if pico1 and pico2:
+            pico_diffs = [abs(pico1.get(k, 0.5) - pico2.get(k, 0.5)) for k in ["population", "intervention", "comparison", "outcome"]]
+            pico_agreement = 0.2 * (1.0 - sum(pico_diffs) / len(pico_diffs))
+        
+        # Quality assessment alignment
+        quality1 = result1.get("quality_assessment", "").lower()
+        quality2 = result2.get("quality_assessment", "").lower()
+        quality_score = 0.1 if quality1 == quality2 else 0.0
+        
+        return min(1.0, decision_match + confidence_score + pico_agreement + quality_score)
+    
+    @staticmethod
+    def resolve_conflict(ai1_result: Dict, ai2_result: Dict, citation: Dict) -> Dict[str, Any]:
+        """Intelligent conflict resolution"""
+        agreement_score = ConflictResolver.calculate_agreement_score(ai1_result, ai2_result)
+        
+        # High agreement - use average
+        if agreement_score >= 0.8:
+            conf1 = ai1_result.get("confidence", 0)
+            conf2 = ai2_result.get("confidence", 0)
+            return {
+                "method": "consensus",
+                "decision": ai1_result.get("decision", "exclude"),
+                "confidence": (conf1 + conf2) / 2,
+                "reasoning": f"High agreement (score: {agreement_score:.2f}). Combined assessment.",
+                "agreement_score": agreement_score
+            }
+        
+        # Medium agreement - use higher confidence
+        elif agreement_score >= 0.6:
+            if ai1_result.get("confidence", 0) >= ai2_result.get("confidence", 0):
+                primary = ai1_result
+                strategy = "conservative"
+            else:
+                primary = ai2_result
+                strategy = "pragmatic"
+            
+            return {
+                "method": "higher_confidence",
+                "decision": primary.get("decision", "exclude"),
+                "confidence": primary.get("confidence", 0),
+                "reasoning": f"Medium agreement. Using {strategy} AI with higher confidence.",
+                "agreement_score": agreement_score
+            }
+        
+        # Low agreement - conflict detected
+        else:
+            return {
+                "method": "conflict_detected",
+                "decision": "conflict",
+                "confidence": min(ai1_result.get("confidence", 0), ai2_result.get("confidence", 0)),
+                "reasoning": f"Low agreement (score: {agreement_score:.2f}). Manual review required.",
+                "agreement_score": agreement_score,
+                "ai1_decision": ai1_result.get("decision"),
+                "ai2_decision": ai2_result.get("decision")
+            }
+
+# Global performance tracker
+performance_tracker = PerformanceTracker()
 
 def parse_xml_file(content: str) -> List[Dict[str, Any]]:
     """Enhanced XML parser supporting multiple formats"""
