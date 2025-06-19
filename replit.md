@@ -103,9 +103,50 @@ pip install fastapi uvicorn sqlalchemy psycopg2-binary langchain-core langchain-
 uvicorn main:app --host 0.0.0.0 --port 5000
 ```
 
+## Recent Changes
+
+### June 19, 2025 - Enhanced Multi-Provider LLM Support
+- **Added Trusted Provider Tiers**: Organized 8 LLM providers into production-ready tiers
+  - Tier 1 (Recommended): OpenAI GPT-4o, Anthropic Claude 3.5 Sonnet
+  - Tier 2 (Local/Self-Hosted): Ollama, OpenAI-Compatible endpoints
+  - Tier 3 (Fast Inference): Groq, Together AI, Cohere
+  - Advanced: Custom provider configuration
+- **Dynamic Provider Factory**: LangChain-based unified interface for all providers
+- **Structured Output Processing**: Pydantic schemas ensure consistent AI responses
+- **Enhanced Frontend**: Provider selection with helpful hints and automatic configuration
+- **Provider-Agnostic Design**: Custom endpoint support for any OpenAI-compatible API
+
+### Core Features Implemented
+- **PICO-TT Criteria Configuration**: Comprehensive systematic review setup
+- **Dual AI Screening**: Conservative vs pragmatic approaches with conflict detection
+- **Real-time Progress Tracking**: Live updates during screening processes
+- **Enhanced File Parsing**: Support for RIS and XML citation formats
+- **Activity Logging**: Complete audit trail of screening decisions
+- **Export Functionality**: JSON export of screening results with metadata
+
+## LLM Provider Support
+
+### Trusted Providers (Tested & Recommended)
+1. **OpenAI** - Most reliable for production screening
+2. **Anthropic Claude** - Excellent reasoning for complex decisions
+3. **Groq** - Ultra-fast inference for high-volume processing
+4. **Together AI** - Cost-effective with good quality
+5. **Ollama** - Local deployment for privacy-sensitive research
+6. **OpenAI-Compatible** - Works with LM Studio, Oobabooga, and other local servers
+7. **Cohere** - Strong multilingual capabilities
+8. **Custom Provider** - Fully configurable for any OpenAI-compatible endpoint
+
+### Technical Implementation
+- **LangChain Integration**: Unified API across all providers
+- **Pydantic Output Parsing**: Structured responses with validation
+- **Dynamic Model Selection**: Provider-specific model lists and defaults
+- **Automatic Endpoint Configuration**: Smart defaults with custom override options
+- **Secure API Key Management**: Environment variable support with secure handling
+
 ## Changelog
-- June 19, 2025. Initial setup
+- June 19, 2025. Initial setup and multi-provider LLM enhancement
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Provider preference: Support for multiple LLM providers with provider-agnostic options.

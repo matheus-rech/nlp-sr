@@ -146,11 +146,12 @@ class ProviderConfig(BaseModel):
     default_endpoint: Optional[str] = None
     supports_streaming: bool = True
 
-# LLM Provider Configurations
+# LLM Provider Configurations - Trusted and Tested Providers
 LLM_PROVIDERS = {
+    # Tier 1: Most Reliable for Production Screening
     "openai": ProviderConfig(
         name="openai",
-        display_name="OpenAI",
+        display_name="OpenAI (Recommended)",
         models=["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
         default_model="gpt-4o",
         requires_api_key=True,
@@ -158,44 +159,69 @@ LLM_PROVIDERS = {
     ),
     "anthropic": ProviderConfig(
         name="anthropic",
-        display_name="Anthropic (Claude)",
+        display_name="Anthropic Claude (Recommended)",
         models=["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
         default_model="claude-3-5-sonnet-20241022",
         requires_api_key=True,
         supports_streaming=True
     ),
+    
+    # Tier 2: Local/Self-Hosted Options
     "ollama": ProviderConfig(
         name="ollama",
         display_name="Ollama (Local)",
-        models=["llama3.1:8b", "llama3.1:70b", "mistral:7b", "codellama:7b", "phi3:medium"],
+        models=["llama3.1:8b", "llama3.1:70b", "llama3:70b", "mistral:7b", "phi3:medium", "qwen2.5:7b"],
         default_model="llama3.1:8b",
         requires_api_key=False,
         default_endpoint="http://localhost:11434",
         supports_streaming=True
     ),
-    "lmstudio": ProviderConfig(
-        name="lmstudio",
-        display_name="LM Studio (Local)",
-        models=["local-model", "llama-3.1-8b", "mistral-7b", "codellama-7b"],
-        default_model="local-model",
+    "openai_compatible": ProviderConfig(
+        name="openai_compatible",
+        display_name="OpenAI-Compatible (Local/Custom)",
+        models=["llama-3.1-8b-instruct", "llama-3.1-70b-instruct", "mistral-7b-instruct", "qwen2.5-7b-instruct"],
+        default_model="llama-3.1-8b-instruct",
         requires_api_key=False,
         default_endpoint="http://localhost:1234/v1",
         supports_streaming=True
     ),
-    "huggingface": ProviderConfig(
-        name="huggingface",
-        display_name="Hugging Face",
-        models=["microsoft/DialoGPT-large", "microsoft/DialoGPT-medium", "facebook/blenderbot-400M-distill"],
-        default_model="microsoft/DialoGPT-large",
-        requires_api_key=True,
-        supports_streaming=False
-    ),
+    
+    # Tier 3: Alternative Commercial Providers
     "cohere": ProviderConfig(
         name="cohere",
         display_name="Cohere",
-        models=["command-r-plus", "command-r", "command", "command-light"],
+        models=["command-r-plus", "command-r", "command-nightly"],
         default_model="command-r-plus",
         requires_api_key=True,
+        supports_streaming=True
+    ),
+    "groq": ProviderConfig(
+        name="groq",
+        display_name="Groq (Fast Inference)",
+        models=["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+        default_model="llama-3.1-70b-versatile",
+        requires_api_key=True,
+        default_endpoint="https://api.groq.com/openai/v1",
+        supports_streaming=True
+    ),
+    "together": ProviderConfig(
+        name="together",
+        display_name="Together AI",
+        models=["meta-llama/Llama-3-8b-chat-hf", "meta-llama/Llama-3-70b-chat-hf", "mistralai/Mixtral-8x7B-Instruct-v0.1"],
+        default_model="meta-llama/Llama-3-70b-chat-hf",
+        requires_api_key=True,
+        default_endpoint="https://api.together.xyz/v1",
+        supports_streaming=True
+    ),
+    
+    # Provider Agnostic Option
+    "custom": ProviderConfig(
+        name="custom",
+        display_name="Custom Provider (Advanced)",
+        models=["custom-model-1", "custom-model-2", "custom-model-3"],
+        default_model="custom-model-1",
+        requires_api_key=True,
+        default_endpoint="https://your-api-endpoint.com/v1",
         supports_streaming=True
     )
 }
@@ -434,18 +460,39 @@ class LLMProviderFactory:
                 return ChatCohere(
                     model=config.model,
                     temperature=config.temperature,
-                    max_tokens=config.max_tokens,
                     cohere_api_key=config.api_key or os.getenv("COHERE_API_KEY")
                 )
             except ImportError:
                 raise ImportError("langchain_cohere not installed. Install with: pip install langchain-cohere")
-        else:
-            # Fallback to OpenAI-compatible endpoint for local models
-            from langchain_openai import ChatOpenAI
+        elif provider == "groq":
+            # Groq uses OpenAI-compatible API
             return ChatOpenAI(
                 model=config.model,
                 temperature=config.temperature,
-                max_tokens=config.max_tokens,
+                base_url=config.endpoint or "https://api.groq.com/openai/v1",
+                api_key=config.api_key or os.getenv("GROQ_API_KEY")
+            )
+        elif provider == "together":
+            # Together AI uses OpenAI-compatible API
+            return ChatOpenAI(
+                model=config.model,
+                temperature=config.temperature,
+                base_url=config.endpoint or "https://api.together.xyz/v1",
+                api_key=config.api_key or os.getenv("TOGETHER_API_KEY")
+            )
+        elif provider in ["openai_compatible", "custom"]:
+            # Generic OpenAI-compatible endpoint for local models and custom providers
+            return ChatOpenAI(
+                model=config.model,
+                temperature=config.temperature,
+                base_url=config.endpoint,
+                api_key=config.api_key or "dummy-key"
+            )
+        else:
+            # Fallback to OpenAI-compatible endpoint
+            return ChatOpenAI(
+                model=config.model,
+                temperature=config.temperature,
                 base_url=config.endpoint,
                 api_key=config.api_key or "dummy-key"
             )
@@ -1557,12 +1604,22 @@ HTML_CONTENT = """
                     <div class="config-row">
                         <label>Provider:</label>
                         <select id="ai1Provider" onchange="updateProviderModels('ai1')">
-                            <option value="openai">OpenAI</option>
-                            <option value="anthropic">Anthropic (Claude)</option>
-                            <option value="ollama">Ollama (Local)</option>
-                            <option value="lmstudio">LM Studio (Local)</option>
-                            <option value="huggingface">Hugging Face</option>
-                            <option value="cohere">Cohere</option>
+                            <optgroup label="🥇 Recommended for Production">
+                                <option value="openai">OpenAI (Recommended)</option>
+                                <option value="anthropic">Anthropic Claude (Recommended)</option>
+                            </optgroup>
+                            <optgroup label="🏠 Local/Self-Hosted">
+                                <option value="ollama">Ollama (Local)</option>
+                                <option value="openai_compatible">OpenAI-Compatible (Local/Custom)</option>
+                            </optgroup>
+                            <optgroup label="🔥 Fast Inference">
+                                <option value="groq">Groq (Fast Inference)</option>
+                                <option value="together">Together AI</option>
+                                <option value="cohere">Cohere</option>
+                            </optgroup>
+                            <optgroup label="⚙️ Advanced">
+                                <option value="custom">Custom Provider (Advanced)</option>
+                            </optgroup>
                         </select>
                     </div>
                     <div class="config-row">
@@ -1586,12 +1643,22 @@ HTML_CONTENT = """
                     <div class="config-row">
                         <label>Provider:</label>
                         <select id="ai2Provider" onchange="updateProviderModels('ai2')">
-                            <option value="openai">OpenAI</option>
-                            <option value="anthropic">Anthropic (Claude)</option>
-                            <option value="ollama">Ollama (Local)</option>
-                            <option value="lmstudio">LM Studio (Local)</option>
-                            <option value="huggingface">Hugging Face</option>
-                            <option value="cohere">Cohere</option>
+                            <optgroup label="🥇 Recommended for Production">
+                                <option value="openai">OpenAI (Recommended)</option>
+                                <option value="anthropic">Anthropic Claude (Recommended)</option>
+                            </optgroup>
+                            <optgroup label="🏠 Local/Self-Hosted">
+                                <option value="ollama">Ollama (Local)</option>
+                                <option value="openai_compatible">OpenAI-Compatible (Local/Custom)</option>
+                            </optgroup>
+                            <optgroup label="🔥 Fast Inference">
+                                <option value="groq">Groq (Fast Inference)</option>
+                                <option value="together">Together AI</option>
+                                <option value="cohere">Cohere</option>
+                            </optgroup>
+                            <optgroup label="⚙️ Advanced">
+                                <option value="custom">Custom Provider (Advanced)</option>
+                            </optgroup>
                         </select>
                     </div>
                     <div class="config-row">
@@ -1723,10 +1790,35 @@ HTML_CONTENT = """
                     'openai': 'https://api.openai.com/v1/chat/completions',
                     'anthropic': 'https://api.anthropic.com/v1/messages',
                     'cohere': 'https://api.cohere.ai/v1/chat',
-                    'huggingface': 'https://api-inference.huggingface.co/models/'
+                    'groq': 'https://api.groq.com/openai/v1',
+                    'together': 'https://api.together.xyz/v1',
+                    'custom': 'https://your-api-endpoint.com/v1'
                 };
                 endpointInput.value = defaultEndpoints[selectedProvider] || '';
             }
+            
+            // Add provider-specific hints
+            const configSection = endpointInput.closest('.config-section');
+            let hintElement = configSection.querySelector('.provider-hint');
+            if (!hintElement) {
+                hintElement = document.createElement('div');
+                hintElement.className = 'provider-hint';
+                hintElement.style.cssText = 'font-size: 0.8rem; color: #6c757d; margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px;';
+                configSection.appendChild(hintElement);
+            }
+            
+            const providerHints = {
+                'openai': '🥇 Most reliable for production. Excellent instruction following and consistent outputs.',
+                'anthropic': '🥇 Highly reliable with strong reasoning. Great for complex screening decisions.',
+                'ollama': '🏠 Run models locally. Requires Ollama to be installed and running on your system.',
+                'openai_compatible': '🏠 Works with LM Studio, Oobabooga, or any OpenAI-compatible local server.',
+                'groq': '🔥 Ultra-fast inference with good quality. Great for high-volume screening.',
+                'together': '🔥 Fast and cost-effective. Good balance of speed and quality.',
+                'cohere': '⚡ Strong performance with good multilingual support.',
+                'custom': '⚙️ Configure your own endpoint. Supports any OpenAI-compatible API.'
+            };
+            
+            hintElement.textContent = providerHints[selectedProvider] || 'Configure the endpoint and model for this provider.';
             
             // Show/hide API key field based on provider requirements
             const apiKeyRow = apiKeyInput.closest('.config-row');
