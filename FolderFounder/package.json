@@ -1,0 +1,13 @@
+{
+  "name": "otto-sr",
+  "version": "3.0.0",
+  "description": "Otto-SR: AI-Powered Systematic Review Screening Tool",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "heroku-postbuild": "npm run build"
+  },
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  }
+}

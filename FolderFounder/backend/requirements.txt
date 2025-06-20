@@ -1,0 +1,52 @@
+# Core FastAPI dependencies
+fastapi==0.115.13
+uvicorn[standard]==0.34.3
+python-multipart==0.0.20
+
+# Database
+sqlalchemy==2.0.41
+psycopg2-binary==2.9.10
+alembic==1.14.0
+
+# LangChain and LLM providers
+langchain-core==0.3.65
+langchain-openai==0.3.24
+langchain-anthropic==0.3.1
+langchain-community==0.3.65
+langchain-google-genai==2.0.0
+openai==1.88.0
+anthropic==0.54.0
+google-generativeai==0.8.4
+
+# Data validation and serialization
+pydantic==2.11.7
+pydantic-settings==2.7.1
+
+# Authentication and security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-decouple==3.8
+
+# File handling
+aiofiles==24.1.0
+python-magic==0.4.27
+
+# Testing
+pytest==8.3.6
+pytest-asyncio==0.24.0
+httpx==0.28.1
+
+# Development tools
+black==24.12.1
+isort==5.13.2
+flake8==7.1.1
+
+# API documentation
+slowapi==0.1.9  # Rate limiting
+
+# Logging and monitoring
+python-json-logger==3.2.1
+
+# Background tasks
+celery==5.4.0  # Optional, for future scaling
+redis==5.2.2   # Optional, for caching
