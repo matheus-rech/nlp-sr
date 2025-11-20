@@ -9,7 +9,7 @@ psycopg2-binary==2.9.10
 alembic==1.14.0
 
 # LangChain and LLM providers
-langchain-core==0.3.65
+langchain-core==0.3.80
 langchain-openai==0.3.24
 langchain-anthropic==0.3.1
 langchain-community==0.3.65
