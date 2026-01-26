@@ -1,7 +1,7 @@
 # Core FastAPI dependencies
 fastapi==0.115.13
 uvicorn[standard]==0.34.3
-python-multipart==0.0.20
+python-multipart==0.0.22
 
 # Database
 sqlalchemy==2.0.41
@@ -9,7 +9,7 @@ psycopg2-binary==2.9.10
 alembic==1.14.0
 
 # LangChain and LLM providers
-langchain-core==0.3.65
+langchain-core==0.3.81
 langchain-openai==0.3.24
 langchain-anthropic==0.3.1
 langchain-community==0.3.65

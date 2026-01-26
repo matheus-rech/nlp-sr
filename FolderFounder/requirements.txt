@@ -2,10 +2,10 @@ fastapi==0.115.13
 uvicorn==0.34.3
 sqlalchemy==2.0.41
 psycopg2-binary==2.9.10
-langchain-core==0.3.65
+langchain-core==0.3.81
 langchain-openai==0.3.24
 aiofiles==24.1.0
-python-multipart==0.0.20
+python-multipart==0.0.22
 pydantic==2.11.7
 anthropic==0.54.0
 python-dotenv==1.1.0
